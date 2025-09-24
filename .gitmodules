@@ -1,0 +1,3 @@
+[submodule "SundouleiaAPI"]
+	path = SundouleiaAPI
+	url = https://github.com/Sundouleia/api.git
