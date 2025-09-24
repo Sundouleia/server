@@ -20,11 +20,11 @@ namespace SundouleiaDiscord.Commands;
 public class SundouleiaCommands : InteractionModuleBase
 {
     private readonly DiscordBotServices _botServices;
-    private readonly ServerTokenGenerator _serverTokenGenerator;                   // the server token generator
-    private readonly ILogger<SundouleiaCommands> _logger;                               // the logger for the SundouleiaCommands
-    private readonly IServiceProvider _services;                                    // our service provider
-    private readonly IConfigurationService<DiscordConfig> _discordConfigService;    // the discord configuration service
-    private readonly IConnectionMultiplexer _connectionMultiplexer;                 // the connection multiplexer for the discord bot
+    private readonly ServerTokenGenerator _serverTokenGenerator;                // the server token generator
+    private readonly ILogger<SundouleiaCommands> _logger;                       // the logger for the SundouleiaCommands
+    private readonly IServiceProvider _services;                                // our service provider
+    private readonly IConfigurationService<DiscordConfig> _discordConfigService;// the discord configuration service
+    private readonly IConnectionMultiplexer _connectionMultiplexer;             // the connection multiplexer for the discord bot
 
     public SundouleiaCommands(DiscordBotServices botServices, ServerTokenGenerator tokenGenerator, 
         ILogger<SundouleiaCommands> logger, IServiceProvider services,
