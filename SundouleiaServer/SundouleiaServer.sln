@@ -1,0 +1,46 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34511.84
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SundouleiaDiscord", "SundouleiaDiscord\SundouleiaDiscord.csproj", "{E917D842-2479-4683-A980-BAD84BBBC3BC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SundouleiaAuth", "SundouleiaAuth\SundouleiaAuth.csproj", "{9F3DDA35-9D22-42C7-A3FA-9F7F77D58439}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SundouleiaServer", "SundouleiaServer\SundouleiaServer.csproj", "{A8E19F98-DAD9-4E10-9ADE-A48DF6FF2374}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SundouleiaShared", "SundouleiaShared\SundouleiaShared.csproj", "{C88D245E-AB1B-4574-8D9E-4274AD96EDBD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SundouleiaAPI", "..\SundouleiaAPI\SundouleiaAPI.csproj", "{48260701-C3A0-4C7F-9303-290572FDC8C5}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E917D842-2479-4683-A980-BAD84BBBC3BC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E917D842-2479-4683-A980-BAD84BBBC3BC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E917D842-2479-4683-A980-BAD84BBBC3BC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E917D842-2479-4683-A980-BAD84BBBC3BC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9F3DDA35-9D22-42C7-A3FA-9F7F77D58439}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9F3DDA35-9D22-42C7-A3FA-9F7F77D58439}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9F3DDA35-9D22-42C7-A3FA-9F7F77D58439}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9F3DDA35-9D22-42C7-A3FA-9F7F77D58439}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A8E19F98-DAD9-4E10-9ADE-A48DF6FF2374}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A8E19F98-DAD9-4E10-9ADE-A48DF6FF2374}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A8E19F98-DAD9-4E10-9ADE-A48DF6FF2374}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A8E19F98-DAD9-4E10-9ADE-A48DF6FF2374}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C88D245E-AB1B-4574-8D9E-4274AD96EDBD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C88D245E-AB1B-4574-8D9E-4274AD96EDBD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C88D245E-AB1B-4574-8D9E-4274AD96EDBD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C88D245E-AB1B-4574-8D9E-4274AD96EDBD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{48260701-C3A0-4C7F-9303-290572FDC8C5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{48260701-C3A0-4C7F-9303-290572FDC8C5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{48260701-C3A0-4C7F-9303-290572FDC8C5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{48260701-C3A0-4C7F-9303-290572FDC8C5}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
