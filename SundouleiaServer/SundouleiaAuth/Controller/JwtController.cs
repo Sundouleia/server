@@ -93,14 +93,10 @@ public class JwtController : Controller
             }
 
             // If the Identity is not banned, see if they are banned via their reputation.
-            if (_dbContext.Auth.AsNoTracking().SingleOrDefault(a => a.UserUID == uid)?.PrimaryUserUID is { } accountUid)
+            if (_dbContext.Auth.Include(a => a.AccountRep).AsNoTracking().SingleOrDefault(a => a.UserUID == uid) is { } auth && auth.AccountRep.IsBanned)
             {
-                // If we are marked as banned, ban all other methods of access and return unauthorized.
-                if (await _dbContext.AccountReputation.AsNoTracking().SingleOrDefaultAsync(r => r.UserUID == accountUid) is { IsBanned: true })
-                {
-                    await EnsureBanFromDetectedRepBan(uid, ident, accountUid);
-                    return Unauthorized("Your account is banned from using the service.");
-                }
+                await EnsureBanFromDetectedRepBan(uid, ident, auth.PrimaryUserUID);
+                return Unauthorized("Your account is banned from using the service.");
             }
 
             // Otherwise, not banned, so log success and create a new jwt from the ID.
