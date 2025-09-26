@@ -12,13 +12,11 @@ public class ReportedUserProfile
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public int ReportID { get; set; }
 
-    // Capture details of the profile at the time of the report.
-    [Required]
-    public DateTime ReportTime { get; set; }
-    [Required]
-    public string Base64AvatarSnapshot { get; set; } // snapshot the pic at time of report so they cant remove it later.
-    [Required]
-    public string DescriptionSnapshot { get; set; } // snapshot the description at time of report so they cant remove it later.
+    // Some Required Information to be in a report.
+    [Required] public DateTime ReportTime       { get; set; }
+    [Required] public bool SnapshotIsNSFW       { get; set; }
+    [Required] public string SnapshotImage      { get; set; }
+    [Required] public string SnapshotDescription{ get; set; } 
 
     // Player who made the report.
     [ForeignKey(nameof(ReportingUser))]

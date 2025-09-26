@@ -9,7 +9,9 @@ using System.Text;
 
 namespace SundouleiaShared.Utils;
 
-/// <summary> The token generator for the server </summary>
+/// <summary>
+///     The token generator for the server
+/// </summary>
 public class ServerTokenGenerator
 {
     private readonly IOptionsMonitor<SundouleiaConfigBase> _configuration;

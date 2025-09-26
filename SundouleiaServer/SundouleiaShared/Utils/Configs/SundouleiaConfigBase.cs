@@ -13,7 +13,8 @@ public class SundouleiaConfigBase : ISundouleiaConfiguration
     public int RedisPool { get; set; } = 50;            // the size of the redi's pool. This means that 
     public string RedisConnectionString { get; set; } = string.Empty; // The connection string for the redis server
     public string ShardName { get; set; } = string.Empty; // The name of the shard
-                                                          // get the value of the key
+    
+    // get the value of the key
     public T GetValue<T>(string key)
     {
         var prop = GetType().GetProperty(key);

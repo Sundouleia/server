@@ -217,10 +217,10 @@ public class DiscordBotServices
                     try
                     {
                         // Conditionally add the reported image
-                        if (!string.IsNullOrEmpty(report.Base64AvatarSnapshot))
+                        if (!string.IsNullOrEmpty(report.SnapshotImage))
                         {
                             var reportedImageFileName = reportedUser.UID + "_profile_reported_" + Guid.NewGuid().ToString("N") + ".png";
-                            var reportedImageStream = new MemoryStream(Convert.FromBase64String(report.Base64AvatarSnapshot));
+                            var reportedImageStream = new MemoryStream(Convert.FromBase64String(report.SnapshotImage));
                             streamsToDispose.Add(reportedImageStream);
                             var reportedImageAttachment = new FileAttachment(reportedImageStream, reportedImageFileName);
                             attachments.Add(reportedImageAttachment);

@@ -16,7 +16,7 @@ public partial class AccountWizard
 
         _logger.LogInformation("{method}:{userId}", nameof(ComponentProfiles), Context.Interaction.User.Id);
 
-        using var gagspeakDb = await GetDbContext().ConfigureAwait(false);
+        using var sundouleiaDb = await GetDbContext().ConfigureAwait(false);
         EmbedBuilder eb = new();
         eb.WithTitle("Your Account Profiles");
         eb.WithColor(Color.Magenta);
@@ -25,7 +25,7 @@ public partial class AccountWizard
             + "🌟 Your Account's Primary Profile" + Environment.NewLine
             + "⭐ Your registered Alt Character Profiles");
         ComponentBuilder cb = new();
-        await AddUserSelection(gagspeakDb, cb, "wizard-profiles-select").ConfigureAwait(false);
+        await AddUserSelection(sundouleiaDb, cb, "wizard-profiles-select").ConfigureAwait(false);
         AddHome(cb);
         await ModifyInteraction(eb, cb).ConfigureAwait(false);
     }
@@ -37,15 +37,15 @@ public partial class AccountWizard
 
         _logger.LogInformation("{method}:{userId}:{uid}", nameof(SelectionProfiles), Context.Interaction.User.Id, uid);
 
-        using var gagspeakDb = await GetDbContext().ConfigureAwait(false);
-        var dbUser = await gagspeakDb.Auth.SingleOrDefaultAsync(u => u.UserUID == uid).ConfigureAwait(false);
+        using var sundouleiaDb = await GetDbContext().ConfigureAwait(false);
+        var dbUser = await sundouleiaDb.Auth.SingleOrDefaultAsync(u => u.UserUID == uid).ConfigureAwait(false);
         EmbedBuilder eb = new();
         string title = string.Equals(dbUser.UserUID, dbUser.PrimaryUserUID, StringComparison.Ordinal) ? "Primary Account Profile" : "Alt Character Profile";
         eb.WithTitle($"{title} - {uid}");
-        await HandleProfiles(eb, gagspeakDb, uid).ConfigureAwait(false);
+        await HandleProfiles(eb, sundouleiaDb, uid).ConfigureAwait(false);
         eb.WithColor(Color.Magenta);
         ComponentBuilder cb = new();
-        await AddUserSelection(gagspeakDb, cb, "wizard-profiles-select").ConfigureAwait(false);
+        await AddUserSelection(sundouleiaDb, cb, "wizard-profiles-select").ConfigureAwait(false);
         AddHome(cb);
         await ModifyInteraction(eb, cb).ConfigureAwait(false);
     }
@@ -57,7 +57,7 @@ public partial class AccountWizard
         var dbUser = await db.Users.SingleOrDefaultAsync(u => u.UID == uid).ConfigureAwait(false);
         var dbUserAuth = await db.Auth.SingleOrDefaultAsync(u => u.UserUID == uid).ConfigureAwait(false);
 
-        var identity = await _connectionMultiplexer.GetDatabase().StringGetAsync("GagspeakHub:UID:" + dbUser.UID).ConfigureAwait(false);
+        var identity = await _multiplexer.GetDatabase().StringGetAsync("SundouleiaHub:UID:" + dbUser.UID).ConfigureAwait(false);
 
         // display the user's set Alias if they have one
         eb.AddField("Vanity UID", dbUser?.Alias ?? "No Vanity UID Set");

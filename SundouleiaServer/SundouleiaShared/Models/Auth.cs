@@ -5,27 +5,35 @@ namespace SundouleiaShared.Models;
 #pragma warning disable CS8632
 
 /// <summary>
-///     The <b>Auth</b> class represents a user's authentication information. <para />
-///     The <b>HashedKey</b> property is a unique identifier, and all auth models 
-///     store the primary user UID so we know who the account owner is if it is a secondary account.
+///     Defines both <seealso cref="UserUID"/> and <seealso cref="PrimaryUserUID"/> on creation. <para />
+///     
+///     With this knowledge we will always have access to account-wide reputation from an
+///     auth lookup. The Attributes allow this to function even if UserUID == PrimaryUserUID.
 /// </summary>
 public class Auth
 {
-    // The "Secret Key" for a profile. The secret key where the UserUID == PrimaryUserUID is the account secret key.
+    // The "Secret Key" for a profile.
     [Key]
     [MaxLength(64)]
-    public string HashedKey { get; set; }        // The "Secret Key" for a profile. The secret key where the UserUID == PrimaryUserUID is the account secret key.
+    public string HashedKey { get; set; }
 
-    public string UserUID { get; set; } // Indexed
-    public User User { get; set; }
+    [Required]
+    public string UserUID { get; set; }
+    
+    [ForeignKey(nameof(UserUID))]
+    public virtual User User { get; set; }
 
-    // Information about the Auth's primary user account, if this auth entry is for an alternate profile.
-    public string? PrimaryUserUID { get; set; } // Indexed
-    public User? PrimaryUser { get; set; }
+    [Required]
+    public string PrimaryUserUID { get; set; }
+    
+    [ForeignKey(nameof(PrimaryUserUID))]
+    public virtual User PrimaryUser { get; set; }
 
-    // Fetch the Uid in a single check.
-    [NotMapped] public string AccountUserUID => PrimaryUserUID ?? UserUID;
-    // Determine if the account is primary or not.
-    [NotMapped] public bool IsPrimary => string.IsNullOrEmpty(PrimaryUserUID);
+    [ForeignKey(nameof(PrimaryUserUID))]
+    public virtual AccountReputation AccountRep { get; set; }
+
+    [NotMapped] public bool IsPrimary => string.Equals(UserUID, PrimaryUserUID);
+
+    // Designed for efficient loading. Without any includes, only retrieves HashedKey, UserUID, PrimaryUID.
 }
 #pragma warning restore CS8632

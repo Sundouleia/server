@@ -1,4 +1,4 @@
-using SundouleiaAPI.Enums;
+using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -19,15 +19,15 @@ public class UserRadarInfo
     [ForeignKey(nameof(UserUID))]
     public virtual User User { get; set; }
 
-    [Key]
+    [Required]
     [Column(Order = 1)]
-    public ushort TerritoryId { get; set; }
+    public ushort WorldId { get; set; } = ushort.MaxValue;
 
-    [Key]
+    [Required]
     [Column(Order = 2)]
-    public ushort WorldId { get; set; }
+    public ushort TerritoryId { get; set; } = ushort.MaxValue;
 
     // Hashed to ensure secure transit without exposing CID over interactions.
-    // If the ID is 0, can assume the user is opted out, or the entry was inproperly disposed of.
-    public string HashedCID { get; set; }
+    // Empty string implies requests are disabled.
+    public string HashedCID { get; set; } = string.Empty;
 }

@@ -105,23 +105,51 @@ public static class SharedDbFunctions
     }
 
     /// <summary>
-    ///     Safely adds a <paramref name="user"/> with their associated <paramref name="auth"/> to the DB. <para />
+    ///     Safely created the primary account profile for a <paramref name="user"/> with their 
+    ///     associated <paramref name="rep"/> and <paramref name="auth"/> to the DB. <para />
     ///     At the same time, this method will generate entries in all other tables user-related data is necessary. <para />
     ///     This will help reduce connection bloat.
     /// </summary>
-    public static async Task CreateUser(User user, Auth auth, ILogger logger, SundouleiaDbContext dbContext, SundouleiaMetrics? metrics = null)
+    public static async Task CreateMainProfile(User user, AccountReputation rep, Auth auth, ILogger logger, SundouleiaDbContext dbContext, SundouleiaMetrics? metrics = null)
     {
         logger.LogInformation($"Creating new profile for: {user.UID} (Alias: {user.Alias})");
         await dbContext.Users.AddAsync(user).ConfigureAwait(false);
+        await dbContext.AccountReputation.AddAsync(rep).ConfigureAwait(false);
         await dbContext.Auth.AddAsync(auth).ConfigureAwait(false);
+        
         // Add AccountReputation if their primaryUid is their UserUid.
-        if (string.Equals(user.UID, auth.AccountUserUID, StringComparison.Ordinal))
+        if (string.Equals(user.UID, auth.PrimaryUserUID, StringComparison.Ordinal))
             await dbContext.AccountReputation.AddAsync(new AccountReputation { UserUID = user.UID }).ConfigureAwait(false);
 
         // Create all other necessary tables for the user now that it is added successfully.
         await dbContext.UserGlobalPerms.AddAsync(new GlobalPermissions { UserUID = user.UID }).ConfigureAwait(false);
-        
         await dbContext.UserProfileData.AddAsync(new UserProfileData { UserUID = user.UID }).ConfigureAwait(false);
+        await dbContext.UserRadarInfo.AddAsync(new UserRadarInfo { UserUID = user.UID }).ConfigureAwait(false);
+
+        logger.LogInformation($"[User {user.UID} (Alias: {user.Alias}) <{user.Tier}>] was created along with other necessary table entries!");
+        await dbContext.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     Creates an alt profile for an account safely, along with their associated <paramref name="auth"/> to the DB. <para />
+    ///     At the same time, this method will generate entries in all other tables user-related data is necessary. <para />
+    ///     This will help reduce connection bloat.
+    /// </summary>
+    public static async Task CreateAltProfile(User user, Auth auth, ILogger logger, SundouleiaDbContext dbContext, SundouleiaMetrics? metrics = null)
+    {
+        logger.LogInformation($"Creating new profile for: {user.UID} (Alias: {user.Alias})");
+        await dbContext.Users.AddAsync(user).ConfigureAwait(false);
+        await dbContext.Auth.AddAsync(auth).ConfigureAwait(false);
+
+        // Add AccountReputation if their primaryUid is their UserUid.
+        if (string.Equals(user.UID, auth.PrimaryUserUID, StringComparison.Ordinal))
+            await dbContext.AccountReputation.AddAsync(new AccountReputation { UserUID = user.UID }).ConfigureAwait(false);
+
+        // Create all other necessary tables for the user now that it is added successfully.
+        await dbContext.UserGlobalPerms.AddAsync(new GlobalPermissions { UserUID = user.UID }).ConfigureAwait(false);
+        await dbContext.UserProfileData.AddAsync(new UserProfileData { UserUID = user.UID }).ConfigureAwait(false);
+        await dbContext.UserRadarInfo.AddAsync(new UserRadarInfo { UserUID = user.UID }).ConfigureAwait(false);
+
         logger.LogInformation($"[User {user.UID} (Alias: {user.Alias}) <{user.Tier}>] was created along with other necessary table entries!");
         await dbContext.SaveChangesAsync().ConfigureAwait(false);
     }

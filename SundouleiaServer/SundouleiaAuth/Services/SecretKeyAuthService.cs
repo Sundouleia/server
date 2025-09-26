@@ -62,19 +62,11 @@ public class SecretKeyAuthService
         // Otherwise grab the dbContext to get our auth.
         using var context = await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
-        Auth? authReply = await context.Auth.AsNoTracking().SingleOrDefaultAsync(a => a.HashedKey == hashedSecretKey).ConfigureAwait(false);
-        // if the reply failed, return authentication failure.
-        if (authReply is null)
-            return AuthenticationFailure(ip);
-
-        // Otherwise it was valid, so fetch the account UID.
-        string accountUid = authReply.AccountUserUID;
-        // If we cannot locate the rep for the account, also fail the authentication.
-        if (await context.AccountReputation.Include(r => r.User).AsNoTracking().SingleOrDefaultAsync(ar => ar.UserUID == accountUid).ConfigureAwait(false) is not { } reputation)
+        if (await context.Auth.Include(a => a.User).Include(a => a.AccountRep).AsNoTracking().SingleOrDefaultAsync(a => a.HashedKey == hashedSecretKey).ConfigureAwait(false) is not { } authReply)
             return AuthenticationFailure(ip);
 
         // Finalize the reply.
-        SecretKeyAuthReply reply = new(true, authReply.UserUID, accountUid, reputation.User.Alias, false, reputation.IsBanned);
+        SecretKeyAuthReply reply = new(true, authReply.UserUID, authReply.PrimaryUserUID, authReply.User.Alias, false, authReply.AccountRep.IsBanned);
         _metrics.IncCounter(MetricsAPI.CounterAuthSuccess);
         return reply;
     }

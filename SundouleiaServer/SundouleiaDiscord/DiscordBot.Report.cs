@@ -105,7 +105,7 @@ internal partial class DiscordBot
                 builder.WithColor(Color.DarkRed);
                 Auth offendingUser = await dbContext.Auth.SingleAsync(u => u.UserUID == split[1]).ConfigureAwait(false);
                 // mark them as banned.
-                if (await dbContext.AccountReputation.SingleOrDefaultAsync(u => u.UserUID == offendingUser.AccountUserUID).ConfigureAwait(false) is { } rep)
+                if (await dbContext.AccountReputation.SingleOrDefaultAsync(u => u.UserUID == offendingUser.PrimaryUserUID).ConfigureAwait(false) is { } rep)
                     rep.IsBanned = true;
 
                 profile.Base64AvatarData = string.Empty;
@@ -132,7 +132,7 @@ internal partial class DiscordBot
                 UserProfileData reportingUserProfile = await dbContext.UserProfileData.SingleAsync(u => u.UserUID == split[2]).ConfigureAwait(false);
                 if (await dbContext.Auth.SingleAsync(u => u.UserUID == split[2]).ConfigureAwait(false) is { } match)
                 {
-                    var reputation = await dbContext.AccountReputation.SingleAsync(u => u.UserUID == match.AccountUserUID).ConfigureAwait(false);
+                    var reputation = await dbContext.AccountReputation.SingleAsync(u => u.UserUID == match.PrimaryUserUID).ConfigureAwait(false);
                     reputation.ProfileViewStrikes++;
                 }
                 await _sundouleiaHubContext.Clients.User(split[2]).SendAsync(nameof(ISundouleiaHub.Callback_ServerMessage),

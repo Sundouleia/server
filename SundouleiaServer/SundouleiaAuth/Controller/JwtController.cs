@@ -93,7 +93,7 @@ public class JwtController : Controller
             }
 
             // If the Identity is not banned, see if they are banned via their reputation.
-            if (_dbContext.Auth.AsNoTracking().SingleOrDefault(a => a.UserUID == uid)?.AccountUserUID is { } accountUid)
+            if (_dbContext.Auth.AsNoTracking().SingleOrDefault(a => a.UserUID == uid)?.PrimaryUserUID is { } accountUid)
             {
                 // If we are marked as banned, ban all other methods of access and return unauthorized.
                 if (await _dbContext.AccountReputation.AsNoTracking().SingleOrDefaultAsync(r => r.UserUID == accountUid) is { IsBanned: true })
@@ -198,7 +198,7 @@ public class JwtController : Controller
     ///     Method to create a temporary JWT token from a provided user ID, character identity, and alias. <para />
     ///     For One-Time AccountGeneration.
     /// </summary>
-    private IActionResult CreateTempAccessJwtFromId(string charaIdent, string localConentId)
+    private IActionResult CreateTempAccessJwtFromId(string charaIdent, string localContentId)
     {
         // Tokens last for 6 hours before refresh.
         JwtSecurityToken token = CreateJwt(new List<Claim>
@@ -257,22 +257,19 @@ public class JwtController : Controller
     /// </summary>
     private async Task EnsureBanFromDetectedIdentBan(string uid, string charaIdent)
     {
-        Auth? matchedAuth = _dbContext.Auth.SingleOrDefault(a => a.UserUID == uid);
-        if (matchedAuth is null)
-        {
-            _logger.LogWarning("AccountAuthNotFound??:{id}:{ident}", uid, charaIdent);
+        if (_dbContext.Auth.Include(a => a.AccountRep).AsNoTracking().SingleOrDefault(a => a.UserUID == uid) is not { } matchedAuth)
             return;
-        }
 
-        string accountUid = matchedAuth.AccountUserUID;
-        if (await _dbContext.AccountReputation.SingleOrDefaultAsync(r => r.UserUID == accountUid) is { } reputation && !reputation.IsBanned)
+        // Ensure ban.
+        if (!matchedAuth.AccountRep.IsBanned)
         {
-            reputation.IsBanned = true;
+            matchedAuth.AccountRep.IsBanned = true;
+            _dbContext.Update(matchedAuth.AccountRep);
             await _dbContext.SaveChangesAsync();
         }
 
-        // Attach the banned discord ID to the ban if the auth claim exists too (have to do separately because people are weird and try to get around bans)
-        if (await _dbContext.AccountClaimAuth.AsNoTracking().Include(a => a.User).FirstOrDefaultAsync(c => c.User!.UID == accountUid) is { } authClaim)
+        // Attach the banned discordID in the auth claims exist.
+        if (await _dbContext.AccountClaimAuth.AsNoTracking().Include(a => a.User).FirstOrDefaultAsync(c => c.User!.UID == matchedAuth.PrimaryUserUID) is { } authClaim)
         {
             if (!_dbContext.BannedRegistrations.AsNoTracking().Any(c => c.DiscordId == authClaim.DiscordId.ToString()))
                 _dbContext.BannedRegistrations.Add(new BannedRegistrations() { DiscordId = authClaim.DiscordId.ToString() });

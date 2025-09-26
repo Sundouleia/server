@@ -90,7 +90,8 @@ public class SundouleiaDbContext : DbContext
         modelBuilder.Entity<ReportedUserProfile>().HasIndex(c => c.ReportingUserUID);
         modelBuilder.Entity<ReportedRadar>().ToTable("reported_radars");
         modelBuilder.Entity<ReportedRadar>().HasIndex(c => c.Kind);
-        modelBuilder.Entity<ReportedRadar>().HasIndex(c => c.TerritoryID);
+        modelBuilder.Entity<ReportedRadar>().HasIndex(c => c.WorldId);
+        modelBuilder.Entity<ReportedRadar>().HasIndex(c => c.TerritoryId);
         modelBuilder.Entity<ReportedRadar>().HasIndex(c => c.ReporterUID);
 
         modelBuilder.Entity<User>().ToTable("users");
@@ -99,7 +100,6 @@ public class SundouleiaDbContext : DbContext
         modelBuilder.Entity<UserProfileData>().ToTable("user_profile");
         modelBuilder.Entity<UserProfileData>().HasIndex(c => c.UserUID);
         modelBuilder.Entity<UserRadarInfo>().ToTable("user_radar_info");
-        modelBuilder.Entity<UserRadarInfo>().HasKey(u => new { u.UserUID, u.TerritoryId, u.WorldId });
         modelBuilder.Entity<UserRadarInfo>().HasIndex(c => c.UserUID);
         modelBuilder.Entity<UserRadarInfo>().HasIndex(c => c.TerritoryId);
         modelBuilder.Entity<UserRadarInfo>().HasIndex(c => c.WorldId);

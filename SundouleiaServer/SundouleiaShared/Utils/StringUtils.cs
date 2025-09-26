@@ -30,23 +30,3 @@ public static class StringUtils
         return BitConverter.ToString(sha256.ComputeHash(Encoding.UTF8.GetBytes(input))).Replace("-", "", StringComparison.OrdinalIgnoreCase);
     }
 }
-
-#pragma warning disable MA0048 // File name must match type name
-public static class ListUtils
-#pragma warning restore MA0048 // File name must match type name
-{
-    private static Random rng = new();
-
-    public static void Shuffle<T>(this IList<T> list)
-    {
-        int n = list.Count;
-        while (n > 1)
-        {
-            n--;
-            int k = rng.Next(n + 1);
-            T value = list[k];
-            list[k] = list[n];
-            list[n] = value;
-        }
-    }
-}

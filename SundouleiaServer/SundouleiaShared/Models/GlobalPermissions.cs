@@ -16,6 +16,11 @@ public class GlobalPermissions
 
     // Various global settings a user can set.
     // can probably figure this out as time goes on, but useful to have for the future.
-    // these could be personal config settings if nobody needs to see them.
-    public bool DummySetting { get; set; } = false; // Placeholder.
+
+    // What is set initially upon adding someone.
+    public bool DefaultAllowAnimations  { get; set; } = false;
+    public bool DefaultAllowSounds      { get; set; } = false;
+    public bool DefaultAllowVfx         { get; set; } = false;
+
+    // Other stuff that can be added later on..
 }

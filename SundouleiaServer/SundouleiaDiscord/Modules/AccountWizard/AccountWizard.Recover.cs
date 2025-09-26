@@ -1,9 +1,9 @@
 using Discord;
 using Discord.Interactions;
+using Microsoft.EntityFrameworkCore;
 using SundouleiaShared.Data;
 using SundouleiaShared.Models;
 using SundouleiaShared.Utils;
-using Microsoft.EntityFrameworkCore;
 using System.Globalization;
 
 namespace SundouleiaDiscord.Modules.AccountWizard;
@@ -20,7 +20,7 @@ public partial class AccountWizard
 
         _logger.LogInformation("{method}:{userId}", nameof(ComponentRecover), Context.Interaction.User.Id);
 
-        using var gagspeakDb = await GetDbContext().ConfigureAwait(false);
+        using var sundouleiaDb = await GetDbContext().ConfigureAwait(false);
         EmbedBuilder eb = new();
         eb.WithColor(Color.Magenta);
         eb.WithTitle("Recover");
@@ -31,7 +31,7 @@ public partial class AccountWizard
             + "- 2️⃣ are all your secondary accounts/UIDs" + Environment.NewLine
             + "If you are using Vanity UIDs the original UID is displayed in the second line of the account selection.");
         ComponentBuilder cb = new();
-        await AddUserSelection(gagspeakDb, cb, "wizard-recover-select").ConfigureAwait(false);
+        await AddUserSelection(sundouleiaDb, cb, "wizard-recover-select").ConfigureAwait(false);
         AddHome(cb);
         await ModifyInteraction(eb, cb).ConfigureAwait(false);
     }
@@ -43,10 +43,10 @@ public partial class AccountWizard
 
         _logger.LogInformation("{method}:{userId}:{uid}", nameof(SelectionRecovery), Context.Interaction.User.Id, uid);
 
-        using var gagspeakDb = await GetDbContext().ConfigureAwait(false);
+        using var sundouleiaDb = await GetDbContext().ConfigureAwait(false);
         EmbedBuilder eb = new();
         eb.WithColor(Color.Green);
-        await HandleRecovery(gagspeakDb, eb, uid).ConfigureAwait(false);
+        await HandleRecovery(sundouleiaDb, eb, uid).ConfigureAwait(false);
         ComponentBuilder cb = new();
         AddHome(cb);
         await ModifyInteraction(eb, cb).ConfigureAwait(false);
@@ -54,23 +54,25 @@ public partial class AccountWizard
 
     private async Task HandleRecovery(SundouleiaDbContext db, EmbedBuilder embed, string uid)
     {
-        string computedHash = string.Empty;
-        Auth auth;
-        var previousAuth = await db.Auth.Include(u => u.User).FirstOrDefaultAsync(u => u.UserUID == uid).ConfigureAwait(false);
-        if (previousAuth != null)
-        {
-            db.Auth.Remove(previousAuth);
-        }
+        // Fetch the previous auth we want to recover. We should then replace that auth with a new one containing a new key.
+        var previousAuth = await db.Auth
+            .Include(a => a.User)
+            .Include(a => a.AccountRep)
+            .FirstOrDefaultAsync(u => u.UserUID == uid)
+            .ConfigureAwait(false);
 
-        computedHash = StringUtils.Sha256String(StringUtils.GenerateRandomString(64) + DateTime.UtcNow.ToString(CultureInfo.InvariantCulture));
-        auth = new Auth()
+        // Remove the outdated auth if it exists.
+        if (previousAuth is not null)
+            db.Auth.Remove(previousAuth);
+
+        var computedHash = StringUtils.Sha256String(StringUtils.GenerateRandomString(64) + DateTime.UtcNow.ToString(CultureInfo.InvariantCulture));
+        var auth = new Auth()
         {
             HashedKey = StringUtils.Sha256String(computedHash),
             User = previousAuth.User,
-            PrimaryUserUID = previousAuth.PrimaryUserUID
+            PrimaryUserUID = previousAuth.PrimaryUserUID,
+            AccountRep = previousAuth.AccountRep
         };
-
-        await db.Auth.AddAsync(auth).ConfigureAwait(false);
 
         embed.WithTitle($"Recovery for {uid} complete");
         embed.WithDescription("This is your new private secret key. Do not share this private secret key with anyone. **If you lose it, it is irrevocably lost.**"

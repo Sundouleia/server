@@ -435,7 +435,7 @@ public class SundouleiaCommands : InteractionModuleBase
             profile.Description = string.Empty;
         }
 
-        var reputation = await db.AccountReputation.SingleOrDefaultAsync(u => u.UserUID == auth.AccountUserUID).ConfigureAwait(false);
+        var reputation = await db.AccountReputation.SingleOrDefaultAsync(u => u.UserUID == auth.PrimaryUserUID).ConfigureAwait(false);
         reputation.IsBanned = false;
 
         // update all tables and save changes.

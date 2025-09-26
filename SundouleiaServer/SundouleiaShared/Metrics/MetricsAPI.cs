@@ -23,13 +23,15 @@ public class MetricsAPI
     // Reporting and chatting.
     public const string CounterProfileUpdates = "sund_profile_updates";
     public const string CounterReportsCreatedProfile = "sund_reports_created_profile";
-    public const string CounterReportsCreatedChat = "sund_reports_created_chat";
     public const string CounterReportsCreatedRadar = "sund_reports_created_radar";
+    public const string CounterReportsCreatedRadarChat = "sund_reports_created_radar_chat";
+    public const string CounterReportsResolved = "sund_reports_resolved";
 
     // IPC
     public const string CounterDataUpdateAll = "sund_data_update_all";
     public const string CounterDataUpdateMods = "sund_data_update_mods";
-    public const string CounterDataUpdateAppearance = "sund_data_update_appearance";
+    public const string CounterDataUpdateOther = "sund_data_update_other";
+    public const string CounterDataUpdateSingle = "sund_data_update_single";
 
     // Mod Updates
     public const string GaugeFilesTotal = "sund_files_total";
@@ -40,7 +42,9 @@ public class MetricsAPI
     public const string CounterRequestsAccepted = "sund_requests_accepted";
     public const string CounterRequestsRejected = "sund_requests_rejected";
     public const string CounterRequestsExpired = "sund_requests_expired";
-    // maybe something for temp if we want to split it, but otherwise no.
+
+    // Radar Gauges here eventually. Don't how since it would require more complex things
+    // like different strings for each area.
 
     // Permissions
     public const string CounterPermissionUpdateGlobal = "sund_permission_update_global";

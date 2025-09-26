@@ -7,16 +7,15 @@ namespace SundouleiaShared.Models;
 // Reputation resolving around said user.
 // Determines if a user is verified, or what restrictions are placed upon them.
 // Also provides the time they were applied, if they have timeout periods.and when they got applied.
+// Useful as a form of moderation, to keep the 'wild people' in check. *catscream*
 /// <summary>
-///     Intended to only be created for the primary profile of accounts. <para />
-///     The primary profile can be accessed via the Auth table. <para />
-///     It is possible to merge this with auth if we have good reason to, as it would reduce 
-///     lookup calls, but until then is cleaner to keep separate. <para />
+///     Reputation resolving around said user, determining if they are verified, banned,
+///     or have certain restrictions placed upon them. <para />
 ///     
-///     This table outlines the reputation of accounts for a user.
-///     Perhaps making it not a foreign key and rather just an indexable identifier would be 
-///     nice to ensure it can be tracked after account deletion.
-///     But that is just an extra step we can take against bypasses if people try it.
+///     Additionally provides optional timeouts once a report is resolved. When they pass the current
+///     time access to the timed out features will be returned. <para />
+///     
+///     Useful as a form of moderation, to keep the 'wild people' in check. <b>catscream</b>
 /// </summary>
 public class AccountReputation
 {
@@ -26,13 +25,13 @@ public class AccountReputation
     [ForeignKey(nameof(UserUID))] 
     public virtual User User { get; set; }
 
-
     public bool IsVerified  { get; set; } = false;  // If the account is connected to the Sundouleia discord bot.
     public bool IsBanned    { get; set; } = false;  // If the account, and all it's profiles, are banned from Sundouleia.
 
     // Helpers that are unmapped for Ban detection.
     [NotMapped] public int WarningStrikes => ProfileViewStrikes + ProfileEditStrikes + RadarStrikes + ChatStrikes;
     [NotMapped] public bool ShouldBan => WarningStrikes >= 5;
+    [NotMapped] public bool NeedsTimeoutReset => ProfileViewTimeout != DateTime.MinValue || ProfileEditTimeout != DateTime.MinValue || RadarTimeout != DateTime.MinValue || ChatTimeout != DateTime.MinValue;
 
     // Reputations are outlined as follows:
     // - If they can do it.

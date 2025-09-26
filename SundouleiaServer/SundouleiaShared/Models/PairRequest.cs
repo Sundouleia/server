@@ -3,11 +3,8 @@ using System.ComponentModel.DataAnnotations;
 namespace SundouleiaShared.Models;
 
 /// <summary>
-/// The UserRequest Model stores the Userdata of the user who send the request
-/// and the use who received the request.
-/// <para>
-/// All sent requests expire after 3 days, (and are automatically rejected).
-/// </para>
+///     Defines a request sent from <b>User</b> to <b>OtherUser</b> <para />
+///     Sent requests expire after 3 days, (and are automatically rejected).
 /// </summary>
 public class PairRequest
 {

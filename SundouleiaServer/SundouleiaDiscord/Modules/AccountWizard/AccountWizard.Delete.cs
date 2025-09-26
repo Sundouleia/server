@@ -13,7 +13,7 @@ public partial class AccountWizard
 
         _logger.LogInformation("{method}:{userId}", nameof(ComponentDelete), Context.Interaction.User.Id);
 
-        using var gagspeakDb = await GetDbContext().ConfigureAwait(false);
+        using var sundouleiaDb = await GetDbContext().ConfigureAwait(false);
         EmbedBuilder eb = new();
         eb.WithTitle("Delete Account");
         eb.WithDescription("You can delete your primary or secondary UIDs here." + Environment.NewLine + Environment.NewLine
@@ -24,7 +24,7 @@ public partial class AccountWizard
         eb.WithColor(Color.Magenta);
 
         ComponentBuilder cb = new();
-        await AddUserSelection(gagspeakDb, cb, "wizard-remove-select").ConfigureAwait(false);
+        await AddUserSelection(sundouleiaDb, cb, "wizard-remove-select").ConfigureAwait(false);
         AddHome(cb);
         await ModifyInteraction(eb, cb).ConfigureAwait(false);
     }
@@ -36,8 +36,8 @@ public partial class AccountWizard
 
         _logger.LogInformation("{method}:{userId}:{uid}", nameof(SelectionDeleteAccount), Context.Interaction.User.Id, uid);
 
-        using var gagspeakDb = await GetDbContext().ConfigureAwait(false);
-        bool isPrimary = gagspeakDb.Auth.Single(u => u.UserUID == uid).PrimaryUserUID is null;
+        using var sundouleiaDb = await GetDbContext().ConfigureAwait(false);
+        bool isPrimary = sundouleiaDb.Auth.Single(u => u.UserUID == uid).PrimaryUserUID is null;
         EmbedBuilder eb = new();
         eb.WithTitle($"Are you sure you want to delete {uid}?");
         eb.WithDescription($"This operation is irreversible. All pairs of {uid}, your settings, and permissions " +

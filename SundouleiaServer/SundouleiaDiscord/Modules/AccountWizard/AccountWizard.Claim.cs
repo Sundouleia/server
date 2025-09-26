@@ -199,10 +199,10 @@ public partial class AccountWizard
                               + Environment.NewLine + Environment.NewLine
                               + "Verification will expire in 10minutes starting now.\nIf you fail to verify, you'll have to register again.");
 
-        // store the initial key to the initialkeymapping.
+        // store the initial key to the initial key mapping.
         _botServices.DiscordInitialKeyMapping[Context.User.Id] = (arg.InitialKeyStr, string.Empty);
 
-        // return sucess with the verification code.
+        // return success with the verification code.
         return true;
     }
 
@@ -239,7 +239,7 @@ public partial class AccountWizard
         // grab tables to be modified.
         var authClaim = await dbContext.AccountClaimAuth.SingleOrDefaultAsync(u => u.DiscordId == Context.User.Id).ConfigureAwait(false);
         var auth = await dbContext.Auth.Include(a => a.User).SingleOrDefaultAsync(u => u.HashedKey == initialKey).ConfigureAwait(false);
-        var rep = await dbContext.AccountReputation.SingleOrDefaultAsync(r => r.UserUID == auth.AccountUserUID).ConfigureAwait(false);
+        var rep = await dbContext.AccountReputation.SingleOrDefaultAsync(r => r.UserUID == auth.PrimaryUserUID).ConfigureAwait(false);
         var user = auth.User;
 
         // If any of the fetched table entries are null, fail it.
@@ -275,46 +275,5 @@ public partial class AccountWizard
         await dbContext.SaveChangesAsync().ConfigureAwait(false);
         // return success with the user's UID
         return (true, user.UID, initialKey);
-    }
-
-    /// <summary>
-    /// Called upon whenever we want to add a new secondary profile to the database. (potentially make another function for verifying the primary claim)
-    /// </summary>
-    /// <param name="db"> the database context </param>
-    /// <returns> the new userUID, and the secretKey associated with it. </returns>
-    private async Task<(string, string)> HandleAddUser(SundouleiaDbContext db)
-    {
-        var accountClaimAuth = db.AccountClaimAuth.SingleOrDefault(u => u.DiscordId == Context.User.Id);
-
-        var user = new User();
-
-        var hasValidUid = false;
-        while (!hasValidUid)
-        {
-            var uid = StringUtils.GenerateRandomString(10);
-            if (db.Users.Any(u => u.UID == uid || u.Alias == uid)) continue;
-            user.UID = uid;
-            hasValidUid = true;
-        }
-
-        user.LastLogin = DateTime.UtcNow;
-
-        var computedHash = StringUtils.Sha256String(StringUtils.GenerateRandomString(64) + DateTime.UtcNow.ToString(CultureInfo.InvariantCulture));
-        var auth = new Auth()
-        {
-            HashedKey = StringUtils.Sha256String(computedHash),
-            User = user,
-        };
-
-        // run the shared database function to create the new profile data.
-        await SharedDbFunctions.CreateUser(user, auth, _logger, db).ConfigureAwait(false);
-        _botServices.Logger.LogInformation($"Registered User [{user.UID} (Alias: {user.Alias})]");
-
-        accountClaimAuth.StartedAt = null;
-        accountClaimAuth.User = user;
-        accountClaimAuth.VerificationCode = null;
-        _botServices.DiscordVerifiedUsers.Remove(Context.User.Id, out _);
-
-        return (user.UID, computedHash);
     }
 }

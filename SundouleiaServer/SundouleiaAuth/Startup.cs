@@ -196,11 +196,7 @@ public class Startup
             MetricsAPI.CounterAuthSuccess,
             MetricsAPI.CounterAuthFailed,
             MetricsAPI.CounterDeletedVerifiedUsers,
-        }, new List<string>
-        {
-            MetricsAPI.GaugeAuthorizedConnections,
-            MetricsAPI.GaugeConnections,
-        }));
+        }, new List<string>()));
     }
 
     /// <summary>

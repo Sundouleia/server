@@ -17,10 +17,10 @@ public partial class AccountWizard
 
         _logger.LogInformation("{method}:{userId}", nameof(ComponentAltProfile), Context.Interaction.User.Id);
 
-        using var gagspeakDb = await GetDbContext().ConfigureAwait(false);
+        using var sundouleiaDb = await GetDbContext().ConfigureAwait(false);
         // fetch the primary account UID associated with the UID we are wanting to create.
-        var primaryUID = (await gagspeakDb.AccountClaimAuth.Include(u => u.User).SingleAsync(u => u.DiscordId == Context.User.Id).ConfigureAwait(false)).User.UID;
-        var secondaryUids = await gagspeakDb.Auth.CountAsync(p => p.PrimaryUserUID == primaryUID).ConfigureAwait(false);
+        var primaryUID = (await sundouleiaDb.AccountClaimAuth.Include(u => u.User).SingleAsync(u => u.DiscordId == Context.User.Id).ConfigureAwait(false)).User.UID;
+        var secondaryUids = await sundouleiaDb.Auth.CountAsync(p => p.PrimaryUserUID == primaryUID).ConfigureAwait(false);
         int remainingProfilesAllowed = 10 - secondaryUids;
         EmbedBuilder eb = new();
         eb.WithColor(Color.Magenta);
@@ -43,7 +43,7 @@ public partial class AccountWizard
         _logger.LogInformation("{method}:{userId}:{primary}", nameof(ComponentNewAltCharProfileCreate), Context.Interaction.User.Id, primaryUid);
 
         // fetch the db context.
-        using var gagspeakDb = await GetDbContext().ConfigureAwait(false);
+        using var sundouleiaDb = await GetDbContext().ConfigureAwait(false);
         EmbedBuilder eb = new();
         // log the title for the creation of a new alt character profile
         eb.WithTitle("Alt Character Profile Created!");
@@ -51,40 +51,47 @@ public partial class AccountWizard
         ComponentBuilder cb = new();
         AddHome(cb);
         // handle the creation of a new alt character profile
-        await HandleAddAltProfile(gagspeakDb, eb, primaryUid).ConfigureAwait(false);
+        await HandleAddAltProfile(sundouleiaDb, eb, primaryUid).ConfigureAwait(false);
         await ModifyInteraction(eb, cb).ConfigureAwait(false);
     }
 
     public async Task HandleAddAltProfile(SundouleiaDbContext db, EmbedBuilder embed, string primaryUID)
     {
-        // get the vanity tier of the primary user UID.
-        var primaryUser = await db.Users.SingleAsync(u => u.UID == primaryUID).ConfigureAwait(false);
-        // construct a new user to the DB, set to have logged in right now.
-        User newUser = new()
-        {
-            CreatedAt = DateTime.UtcNow,
-            LastLogin = DateTime.UtcNow,
-            Tier = primaryUser.Tier
-        };
+        // Locate the account's main profile user.
+        var accountMain = await db.AccountReputation.Include(r => r.User).AsNoTracking().SingleAsync(r => r.UserUID == primaryUID).ConfigureAwait(false);
 
         // while the UID is not unique, generate a new one.
         var hasValidUid = false;
+        var generatedUid = string.Empty;
         while (!hasValidUid)
         {
             var uid = StringUtils.GenerateRandomString(10);
-            if (await db.Users.AnyAsync(u => u.UID == uid || u.Alias == uid).ConfigureAwait(false)) continue;
-            newUser.UID = uid;
+            if (await db.Users.AsNoTracking().AnyAsync(u => u.UID == uid || u.Alias == uid).ConfigureAwait(false))
+                continue;
+            generatedUid = uid;
             hasValidUid = true;
         }
 
+        // Create the new User and Auth entries for the alt profile.
+        User newUser = new()
+        {
+            UID = generatedUid,
+            CreatedAt = DateTime.UtcNow,
+            LastLogin = DateTime.UtcNow,
+            Tier = accountMain.User.Tier
+        };
         // compute the secret key for the user, and initialize the auth as an alt character profile, linking it to the primary account.
         var computedHash = StringUtils.Sha256String(StringUtils.GenerateRandomString(64) + DateTime.UtcNow.ToString(CultureInfo.InvariantCulture));
         var auth = new Auth()
         {
-            HashedKey = computedHash,
+            HashedKey = StringUtils.Sha256String(computedHash),
+            UserUID = newUser.UID,
             User = newUser,
-            PrimaryUserUID = primaryUID
+            PrimaryUserUID = primaryUID,
+            PrimaryUser = accountMain.User,
+            AccountRep = accountMain
         };
+
         // add the rows to the user and the auth tables in the database, and save the changes.
         await db.Users.AddAsync(newUser).ConfigureAwait(false);
         await db.Auth.AddAsync(auth).ConfigureAwait(false);

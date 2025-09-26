@@ -17,23 +17,22 @@ public partial class AccountWizard : InteractionModuleBase
     private ILogger<AccountWizard> _logger;
     private IServiceProvider _services;
     private DiscordBotServices _botServices;
-    private IConfigurationService<ServerConfig> _gagspeakConfigService;
-    private IConfigurationService<DiscordConfig> _discordConfigService;
-    private IConnectionMultiplexer _connectionMultiplexer;
+    private IConfigurationService<ServerConfig> _serverConfig;
+    private IConfigurationService<DiscordConfig> _discordConfig;
+    private IConnectionMultiplexer _multiplexer;
     private IDbContextFactory<SundouleiaDbContext> _dbContextFactory;
     private Random random = new();
 
     public AccountWizard(ILogger<AccountWizard> logger, IServiceProvider services, DiscordBotServices botServices,
-        IConfigurationService<ServerConfig> gagspeakConfigService,
-        IConfigurationService<DiscordConfig> discordConfigService, IConnectionMultiplexer connectionMultiplexer,
-        IDbContextFactory<SundouleiaDbContext> dbContextFactory)
+        IConfigurationService<ServerConfig> serverConfig, IConfigurationService<DiscordConfig> discordConfig, 
+        IConnectionMultiplexer multiplexer, IDbContextFactory<SundouleiaDbContext> dbContextFactory)
     {
         _logger = logger;
         _services = services;
         _botServices = botServices;
-        _gagspeakConfigService = gagspeakConfigService;
-        _discordConfigService = discordConfigService;
-        _connectionMultiplexer = connectionMultiplexer;
+        _serverConfig = serverConfig;
+        _discordConfig = discordConfig;
+        _multiplexer = multiplexer;
         _dbContextFactory = dbContextFactory;
     }
 
@@ -50,10 +49,10 @@ public partial class AccountWizard : InteractionModuleBase
         _logger.LogInformation("{method}:{userId}", nameof(StartAccountManagementWizard), Context.Interaction.User.Id);
 
         // fetch the database context to see if they already have a claimed account.
-        using SundouleiaDbContext gagspeakDb = await GetDbContext().ConfigureAwait(false);
+        using SundouleiaDbContext sundouleiaDb = await GetDbContext().ConfigureAwait(false);
         // the user has an account of they have an accountClaimAuth in the database matching their discord ID.
         // Additionally, it checks to see if the time started at is null, meaning the claiming process has finished.
-        bool hasAccount = await gagspeakDb.AccountClaimAuth.AnyAsync(u => u.DiscordId == Context.User.Id && u.StartedAt == null).ConfigureAwait(false);
+        bool hasAccount = await sundouleiaDb.AccountClaimAuth.AnyAsync(u => u.DiscordId == Context.User.Id && u.StartedAt == null).ConfigureAwait(false);
 
         EmbedBuilder eb = new();
         eb.WithTitle("Welcome to CK's Sundouleia Account Management. How may I help you today?");
@@ -63,9 +62,9 @@ public partial class AccountWizard : InteractionModuleBase
             + (hasAccount ? string.Empty : ("- If you are using a new Discord Account, select \"🔗 Relink Account\"" + Environment.NewLine))
             // if the user DOES HAVE AN ACCOUNT, these options will display in place of empty strings.
             + (!hasAccount ? string.Empty : ("- To view your profiles in your Account, press \"📖 View Profiles\"" + Environment.NewLine))
-            // + (!hasAccount ? string.Empty : ("- You lost your secret key press \"🏥 Recover\"" + Environment.NewLine)) // this wont fully work yet due to the way our system is set up
             + (!hasAccount ? string.Empty : ("- To add a new profile for an alt character, press \"🏷️ Add Profile\"" + Environment.NewLine))
             + (!hasAccount ? string.Empty : ("- To view and set your vanity perks, press \"💄 Vanity Perks\"" + Environment.NewLine))
+            + (!hasAccount ? string.Empty : ("- To record a profile secret key, press \"🏥 Recover\"" + Environment.NewLine))
             + (!hasAccount ? string.Empty : ("- Delete your primary or secondary accounts with \"⚠️ Remove\""))
             );
         eb.WithColor(Color.Magenta);
@@ -83,6 +82,7 @@ public partial class AccountWizard : InteractionModuleBase
             cb.WithButton("View Profiles", "wizard-profiles", ButtonStyle.Secondary, new Emoji("📖"));
             cb.WithButton("Add Profile", "wizard-alt-profile", ButtonStyle.Secondary, new Emoji("🏷️"));
             cb.WithButton("Vanity Perks", "wizard-vanity", ButtonStyle.Secondary, new Emoji("💄"));
+            cb.WithButton("Recover", "wizard-recover", ButtonStyle.Secondary, new Emoji("🏥"));
             cb.WithButton("Remove", "wizard-remove", ButtonStyle.Danger, new Emoji("⚠️"));
         }
 
@@ -90,7 +90,7 @@ public partial class AccountWizard : InteractionModuleBase
         // send the message as an ephemeral message, meaning a reply personalized so only the user can see it.
         if (init)
         {
-            bool isBanned = await gagspeakDb.BannedRegistrations.AnyAsync(u => u.DiscordId == Context.User.Id.ToString()).ConfigureAwait(false);
+            bool isBanned = await sundouleiaDb.BannedRegistrations.AnyAsync(u => u.DiscordId == Context.User.Id.ToString()).ConfigureAwait(false);
             if (isBanned)
             {
                 EmbedBuilder ebBanned = new();
@@ -201,11 +201,11 @@ public partial class AccountWizard : InteractionModuleBase
     /// Helper function for adding the profile selection under the inspect account section.
     /// This will allow the user to select a profile to view each of their distinct profiles registered under their account.
     /// </summary>
-    private async Task AddUserSelection(SundouleiaDbContext gagspeakDb, ComponentBuilder cb, string customId)
+    private async Task AddUserSelection(SundouleiaDbContext sundouleiaDb, ComponentBuilder cb, string customId)
     {
         ulong discordId = Context.User.Id;                                                // Get the Discord ID of the current user
 
-        AccountClaimAuth existingAuth = await gagspeakDb.AccountClaimAuth.Include(u => u.User)       // then fetch the existing auth for the primary user
+        AccountClaimAuth existingAuth = await sundouleiaDb.AccountClaimAuth.Include(u => u.User)       // then fetch the existing auth for the primary user
             .SingleOrDefaultAsync(e => e.DiscordId == discordId).ConfigureAwait(false); // where accountClaimAuth's discord ID matches interacting discord user ID
 
         // If there is an existing authorization, we have found a primary user to generate secondary users for.
@@ -218,7 +218,7 @@ public partial class AccountWizard : InteractionModuleBase
             sb.WithCustomId(customId);
 
             // now fetch a List of Auth objects which satisfies:
-            List<Auth> existingUids = await gagspeakDb.Auth
+            List<Auth> existingUids = await sundouleiaDb.Auth
                 .Include(u => u.User)                             // the Auth object contains a user (they are associated)                           
                 .Where(u => u.UserUID == existingAuth.User.UID    // where the user's UID in the Auth is the same as the primary user ID in the AccountClaimAuth.
                     || u.PrimaryUserUID == existingAuth.User.UID) // or where the primary user UID of the Auth object is the same as the user ID in the AccountClaimAuth.

@@ -2,7 +2,6 @@ using System.Text;
 
 namespace SundouleiaShared.Utils.Configuration;
 
-/// <summary> Config for the server </summary>
 public class ServerConfig : SundouleiaConfigBase
 {
     // Can maybe add a Cdn here if necessary.

@@ -4,12 +4,13 @@ namespace SundouleiaShared.Utils.Configuration;
 
 public class DiscordConfig : SundouleiaConfigBase
 {
-    public string BotToken           { get; set; } = string.Empty;
-    public ulong? CkGuildId          { get; set; } = null;
-    public ulong? SundouleiaGuildId  { get; set; } = null;
-    public ulong? ChannelForMessages { get; set; } = null;
-    public ulong? ChannelForReports  { get; set; } = null;
-    public ulong? ChannelForCommands { get; set; } = null;
+    public string BotToken              { get; set; } = string.Empty;
+    public ulong? CkGuildId             { get; set; } = null; // To pull the other vanity roles from.
+    public ulong? SundouleiaGuildId     { get; set; } = null;
+    public ulong? ChannelForMessages    { get; set; } = null; // For the sundouleia server.
+    public ulong? CkChannelForMessages  { get; set; } = null;
+    public ulong? ChannelForReports     { get; set; } = null;
+    public ulong? ChannelForCommands    { get; set; } = null;
     
     // Ck VanityRole IDs
     public Dictionary<ulong, string> CkVanityRoles { get; set; } = new Dictionary<ulong, string>();
@@ -28,6 +29,7 @@ public class DiscordConfig : SundouleiaConfigBase
         sb.AppendLine($"{nameof(CkGuildId)} => {CkGuildId}");
         sb.AppendLine($"{nameof(SundouleiaGuildId)} => {SundouleiaGuildId}");
         sb.AppendLine($"{nameof(ChannelForMessages)} => {ChannelForMessages}");
+        sb.AppendLine($"{nameof(CkChannelForMessages)} => {CkChannelForMessages}");
         sb.AppendLine($"{nameof(ChannelForReports)} => {ChannelForReports}");
         sb.AppendLine($"{nameof(ChannelForCommands)} => {ChannelForCommands}");
         foreach (var role in CkVanityRoles)
