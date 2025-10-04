@@ -11,7 +11,6 @@ public partial class SundouleiaHub
     [Authorize(Policy = "Identified")]
     public async Task<List<OnlineUser>> UserGetOnlinePairs()
     {
-        _logger.LogCallInfo();
         var allPairedUsers = await GetPairedUnpausedUsers().ConfigureAwait(false);
         var pairs = await GetOnlineUsers(allPairedUsers).ConfigureAwait(false);
         // send that you are online to all connected online pairs of the client caller.

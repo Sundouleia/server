@@ -165,6 +165,7 @@ public partial class SundouleiaHub
         // Add them to the DB.
         await DbContext.ClientPairs.AddAsync(callerToRecipient).ConfigureAwait(false);
         await DbContext.ClientPairs.AddAsync(recipientToCaller).ConfigureAwait(false);
+        await DbContext.SaveChangesAsync().ConfigureAwait(false);
 
         // If the existing data is marked as null then we should abort as there is a serious issue going on.
         // This should only return null if they are not paired, but we just added that they are.

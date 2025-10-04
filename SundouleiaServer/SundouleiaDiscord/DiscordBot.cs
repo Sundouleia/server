@@ -117,13 +117,16 @@ internal partial class DiscordBot : IHostedService
     /// </summary>
     private async Task DiscordClient_Ready()
     {
-        var ckGuildId = _discordConfig.GetValueOrDefault(nameof(DiscordConfig.CkGuildId), 0ul);
-        var sundouleiaGuildId = _discordConfig.GetValueOrDefault(nameof(DiscordConfig.SundouleiaGuildId), 0ul);
+        var ckGuildId = _discordConfig.GetValueOrDefault<ulong?>(nameof(DiscordConfig.CkGuildId), 0ul);
+        var sundouleiaGuildId = _discordConfig.GetValueOrDefault<ulong?>(nameof(DiscordConfig.SundouleiaGuildId), 0ul);
         // we want to obtain the guilds for Ck and Sundouleia.
         var guilds = await _discordClient.Rest.GetGuildsAsync().ConfigureAwait(false);
 
+        _logger.LogInformation($"Bot found in {guilds.Count} guilds: {string.Join(", ", guilds.Select(g => $"{g.Name} ({g.Id})"))}");
+        _logger.LogInformation($"Ck GuildId: {ckGuildId}, Sundouleia GuildId: {sundouleiaGuildId}");
         RestGuild? sundouleiaGuild = guilds.FirstOrDefault(g => g.Id == sundouleiaGuildId);
         RestGuild? ckGuild = guilds.FirstOrDefault(g => g.Id == ckGuildId);
+        _logger.LogInformation($"Ck Guild: {(ckGuild is null ? "Not Found" : ckGuild.Name)}, Sundouleia Guild: {(sundouleiaGuild is null ? "Not Found" : sundouleiaGuild.Name)}");
 
         // Register the commands for the sundouleiaGuid.
         if (sundouleiaGuild is not null)
@@ -134,6 +137,10 @@ internal partial class DiscordBot : IHostedService
         _updateStatusCts?.Dispose();
         _updateStatusCts = new();
         _ = UpdateStatusAsync(_updateStatusCts.Token);
+
+        // Cache CkGuild if present.
+        if (ckGuild is not null)
+            _botServices.UpdateCkGuild(ckGuild);
 
         // Create the model for the sundouleia Guild.
         if (sundouleiaGuild is not null)

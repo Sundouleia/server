@@ -81,6 +81,7 @@ public partial class SundouleiaHub
     private async Task<List<string>> SendOnlineToAllPairedUsers()
     {
         var pairedUids = await GetPairedUnpausedUsers().ConfigureAwait(false);
+        _logger.LogMessage($"{UserUID} had {pairedUids.Count} paired unpaused users: {string.Join(", ", pairedUids)}");
         var self = await DbContext.Users.AsNoTracking().SingleAsync(u => u.UID == UserUID).ConfigureAwait(false);
         await Clients.Users(pairedUids).Callback_UserOnline(new(self.ToUserData(), UserCharaIdent)).ConfigureAwait(false);
         return pairedUids;

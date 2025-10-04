@@ -78,8 +78,6 @@ public partial class SundouleiaHub : Hub<ISundouleiaHub>, ISundouleiaHub
     [Authorize(Policy = "Identified")]
     public async Task<ConnectionResponse> GetConnectionResponse()
     {
-        _logger.LogCallInfo();
-
         // Fail if not yet authenticated (identified)
         if (await DbContext.Auth.AsNoTracking().Include(a => a.User).FirstOrDefaultAsync(a => a.UserUID == UserUID).ConfigureAwait(false) is not { } auth)
         {
