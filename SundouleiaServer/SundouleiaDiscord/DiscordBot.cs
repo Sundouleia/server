@@ -282,7 +282,7 @@ internal partial class DiscordBot : IHostedService
             {
                 _logger.LogInformation("Updating Vanity Roles From Config File");
                 // fetch the roles from the configuration list.
-                Dictionary<ulong, string> vanityRoles = _discordConfig.GetValueOrDefault(nameof(DiscordConfig.SundouleiaVanityRoles), new Dictionary<ulong, string>());
+                Dictionary<ulong, string> vanityRoles = _discordConfig.GetValueOrDefault(nameof(DiscordConfig.VanityRoles), new Dictionary<ulong, string>());
                 
                 // if the vanity roles are not the same as the list fetched from the bot service,
                 if (vanityRoles.Keys.Count != _botServices.VanityRoles.Count)
@@ -323,7 +323,7 @@ internal partial class DiscordBot : IHostedService
             {
                 _logger.LogInformation("Adding VanityRoles to Active Supporters of CK");
                 // get the list of allowed roles that should have vanity UID's from the Vanity Roles in the discord configuration.
-                Dictionary<ulong, string> allowedRoleIds = _discordConfig.GetValueOrDefault(nameof(DiscordConfig.SundouleiaVanityRoles), new Dictionary<ulong, string>());
+                Dictionary<ulong, string> allowedRoleIds = _discordConfig.GetValueOrDefault(nameof(DiscordConfig.VanityRoles), new Dictionary<ulong, string>());
 
                 // await the creation of a scope for this service
                 using var scope = _services.CreateAsyncScope();

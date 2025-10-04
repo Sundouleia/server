@@ -25,5 +25,6 @@ public class ClientPair
     [Timestamp]
     public byte[] Timestamp { get; set; }
 
+    public DateTime CreatedAt { get; set; }
     public bool IsTemporary { get; set; } = false;
 }

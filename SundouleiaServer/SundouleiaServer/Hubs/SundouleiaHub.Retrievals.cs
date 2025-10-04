@@ -31,7 +31,8 @@ public partial class SundouleiaHub
                 new UserData(p.Key, p.Value.Alias, p.Value.Tier, p.Value.Created),
                 p.Value.OwnPerms.ToApi(),
                 p.Value.OtherGlobals.ToApi(),
-                p.Value.OtherPerms.ToApi()
+                p.Value.OtherPerms.ToApi(),
+                p.Value.IsTemporary
             );
             return pairList;
         }).ToList();
@@ -44,7 +45,7 @@ public partial class SundouleiaHub
     /// </summary>
     
     [Authorize(Policy = "Identified")]
-    public async Task<List<PendingRequest>> UserGetPendingRequests()
+    public async Task<List<SundesmoRequest>> UserGetSundesmoRequests()
         => await DbContext.Requests.AsNoTracking()
         .Where(k => k.UserUID == UserUID || k.OtherUserUID == UserUID)
         .Select(r => r.ToApi())
@@ -57,8 +58,15 @@ public partial class SundouleiaHub
     ///     the profile data may vary for privacy purposes.
     /// </summary>
     [Authorize(Policy = "Identified")]
-    public async Task<FullProfileData> UserGetProfileData(UserDto user)
+    public async Task<FullProfileData> UserGetProfileData(UserDto user, bool allowNSFW)
     {
+        // If requested profile matches the caller, return the full profile always.
+        if (string.Equals(user.User.UID, UserUID, StringComparison.Ordinal))
+        {
+            var ownProfile = await DbContext.UserProfileData.AsNoTracking().SingleAsync(u => u.UserUID == UserUID).ConfigureAwait(false);
+            return new FullProfileData(user.User, ownProfile.FromProfileData(), ownProfile.Base64AvatarData);
+        }
+
         // Obtain the auth to know if they are allowed to view the profile to begin with, and if the caller is legit.
         if (await DbContext.Auth.Include(a => a.AccountRep).AsNoTracking().SingleOrDefaultAsync(a => a.UserUID == UserUID).ConfigureAwait(false) is not { } auth)
             return new FullProfileData(user.User, new ProfileContent(), string.Empty);
@@ -67,21 +75,31 @@ public partial class SundouleiaHub
         if (!auth.AccountRep.ProfileViewing)
             return new FullProfileData(user.User, new ProfileContent() { Description = "Your Account Reputation prevents you from viewing profiles." }, string.Empty);
 
-        // Get the pairs of the context caller.
-        var callerPairs = await GetPairedUnpausedUsers().ConfigureAwait(false);
-        // Obtain the profile data entry from the DBContext.
-        var profile = await DbContext.UserProfileData.AsNoTracking().SingleAsync(u => u.UserUID == user.User.UID).ConfigureAwait(false);
 
-        // If the profile is marked as non-public, and not the callers profile, return a private profile.
-        if (!callerPairs.Contains(user.User.UID, StringComparer.Ordinal) && !string.Equals(user.User.UID, UserUID, StringComparison.Ordinal) && !profile.IsPublic)
-            return new FullProfileData(user.User, new ProfileContent() { Description = "Profile is not Public!" }, string.Empty);
+        // Profile is valid so get the full profile data.
+        var profile = await DbContext.UserProfileData.AsNoTracking().SingleAsync(u => u.UserUID == user.User.UID).ConfigureAwait(false);
+        var content = profile.FromProfileData();
+
+        // Get the pairs of the context caller for the IsPublic check.
+        if (!profile.IsPublic)
+        {
+            var callerPairs = await GetPairedUnpausedUsers().ConfigureAwait(false);
+            if (!callerPairs.Contains(user.User.UID, StringComparer.Ordinal))
+                return new FullProfileData(user.User, content with { Description = "Profile Pic is hidden as they have not allowed public plates!" }, string.Empty);
+        }
 
         // If the profile is disabled by moderation, return that it is disabled.
         if (profile.IsDisabled)
-            return new FullProfileData(user.User, new ProfileContent() { Disabled = true, Description = "This profile is currently disabled" }, string.Empty);
+            return new FullProfileData(user.User, content with { Description = "This profile is disabled" }, string.Empty);
 
-        // Profile is valid so get the full profile data.
-        var content = profile.FromProfileData();
+        if (profile.FlaggedForReport)
+            return new FullProfileData(user.User, content with { Description = "Profile is pending review from Sundouleia after being reported" }, string.Empty);
+
+        if (profile.IsNSFW && !allowNSFW)
+            return new FullProfileData(user.User, content, string.Empty);
+        // If NSFW 
+
+
         return new FullProfileData(user.User, content, profile.Base64AvatarData);
     }
 }

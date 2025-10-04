@@ -17,6 +17,8 @@ public class MetricsAPI
     public const string CounterAuthSuccess = "sund_authentication_success";
     public const string CounterAuthFailed = "sund_authentication_failed";
     public const string GaugeUsersRegistered = "sund_users_registered";
+    public const string CounterUsersBlocked = "sund_users_blocked";
+    public const string CounterUsersUnblocked = "sund_users_unblocked";
     public const string CounterDeletedVerifiedUsers = "sund_users_registered_deleted";
     public const string GaugePairings = "sund_pairs";
 

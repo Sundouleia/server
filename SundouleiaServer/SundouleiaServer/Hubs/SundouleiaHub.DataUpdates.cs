@@ -24,9 +24,24 @@ public partial class SundouleiaHub
     {
         var recipientUids = dto.Recipients.Select(r => r.UID).ToList();
         _logger.LogCallInfo(SundouleiaHubLogger.Args(recipientUids.Count));
-        await Clients.Users(recipientUids).Callback_IpcUpdateMods(new(new(UserUID), dto.ModData)).ConfigureAwait(false);
+
+        var requiresUpload = new List<ModFileInfo>();
+        var validModsToAdd = new List<ModFileData>();
+        foreach (var modToAdd in dto.Mods.NewModsToAdd)
+        {
+            // Should also be doing some extension check here likely.
+            // grab the upload link for the file with the hash and replaced path or whatever.
+            var dlLink = string.Empty;
+            if (string.IsNullOrEmpty(dlLink))
+                requiresUpload.Add(modToAdd);
+            else
+                validModsToAdd.Add(new(modToAdd.Hash, modToAdd.GamePaths, modToAdd.SwappedPath, dlLink));
+        }
+        var returnModDto = new RecievedModUpdate(validModsToAdd, dto.Mods.HashesToRemove);
+        await Clients.Users(recipientUids).Callback_IpcUpdateFull(new(new(UserUID), returnModDto, dto.Visuals)).ConfigureAwait(false);
         
         _metrics.IncCounter(MetricsAPI.CounterDataUpdateAll);
+        // Send back to the caller the files that still need to be uploaded.
         return HubResponseBuilder.Yippee();
     }
 
@@ -37,8 +52,24 @@ public partial class SundouleiaHub
     {
         var recipientUids = dto.Recipients.Select(r => r.UID).ToList();
         _logger.LogCallInfo(SundouleiaHubLogger.Args(recipientUids.Count));
-        await Clients.Users(recipientUids).Callback_IpcUpdateMods(new(new(UserUID), dto.ModData)).ConfigureAwait(false);
+
+        var requiresUpload = new List<ModFileInfo>();
+        var validModsToAdd = new List<ModFileData>();
+        foreach (var modToAdd in dto.Mods.NewModsToAdd)
+        {
+            // Should also be doing some extension check here likely.
+            // grab the upload link for the file with the hash and replaced path or whatever.
+            var dlLink = string.Empty;
+            if (string.IsNullOrEmpty(dlLink))
+                requiresUpload.Add(modToAdd);
+            else
+                validModsToAdd.Add(new(modToAdd.Hash, modToAdd.GamePaths, modToAdd.SwappedPath, dlLink));
+        }
+        var returnModDto = new RecievedModUpdate(validModsToAdd, dto.Mods.HashesToRemove);
+        await Clients.Users(recipientUids).Callback_IpcUpdateMods(new(new(UserUID), returnModDto)).ConfigureAwait(false);
+        
         _metrics.IncCounter(MetricsAPI.CounterDataUpdateMods);
+        // Send back to the caller the files that still need to be uploaded.
         return HubResponseBuilder.Yippee();
     }
 
@@ -47,7 +78,7 @@ public partial class SundouleiaHub
     public async Task<HubResponse> UserPushIpcOther(PushIpcOther dto)
     {
         var recipientUids = dto.Recipients.Select(r => r.UID);
-        await Clients.Users(recipientUids).Callback_IpcUpdateOther(new(new(UserUID), dto.IpcData)).ConfigureAwait(false);
+        await Clients.Users(recipientUids).Callback_IpcUpdateOther(new(new(UserUID), dto.Visuals)).ConfigureAwait(false);
         _metrics.IncCounter(MetricsAPI.CounterDataUpdateOther);
         return HubResponseBuilder.Yippee();
     }
@@ -59,7 +90,7 @@ public partial class SundouleiaHub
         // Hide this after we finish debugging.
         _logger.LogCallInfo(SundouleiaHubLogger.Args(dto));
         var recipientUids = dto.Recipients.Select(r => r.UID);
-        await Clients.Users(recipientUids).Callback_IpcUpdateSingle(new(new(UserUID), dto.Type, dto.NewData)).ConfigureAwait(false);
+        await Clients.Users(recipientUids).Callback_IpcUpdateSingle(new(new(UserUID), dto.Object, dto.Kind, dto.NewData)).ConfigureAwait(false);
         _metrics.IncCounter(MetricsAPI.CounterDataUpdateSingle);
         return HubResponseBuilder.Yippee();
     }

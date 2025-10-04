@@ -312,7 +312,6 @@ public class Startup
         {
             MetricsAPI.CounterInitializedConnections,
             MetricsAPI.CounterDeletedVerifiedUsers,
-            MetricsAPI.GaugePairings,
 
             MetricsAPI.CounterProfileUpdates,
             MetricsAPI.CounterReportsCreatedRadar,
@@ -343,8 +342,6 @@ public class Startup
             MetricsAPI.GaugePairings,
 
             MetricsAPI.GaugeFilesTotal,
-
-            MetricsAPI.GaugePairings,
         }));
     }
 

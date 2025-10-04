@@ -49,6 +49,7 @@ public class UserCleanupService : BackgroundService
 
                 CleanUpTimedOutAccountAuthClaims(dbContext);
                 CleanupOutdatedPairRequests(dbContext);
+                CleanupTemporaryPairs(dbContext);
 
                 dbContext.SaveChanges();
             }
@@ -69,7 +70,12 @@ public class UserCleanupService : BackgroundService
             _logger.LogInformation("Resetting Reputation Timeouts");
 
             var curTime = DateTime.UtcNow;
-            var reputationsToFix = await dbContext.AccountReputation.Where(rep => rep.NeedsTimeoutReset).ToListAsync().ConfigureAwait(false);
+            var reputationsToFix = await dbContext.AccountReputation
+                .Where(rep => rep.ProfileViewTimeout != DateTime.MinValue
+                || rep.ProfileEditTimeout != DateTime.MinValue
+                || rep.RadarTimeout != DateTime.MinValue
+                || rep.ChatTimeout != DateTime.MinValue)
+                .ToListAsync().ConfigureAwait(false);
             foreach (var rep in reputationsToFix)
             {
                 if (rep.ProfileViewTimeout != DateTime.MinValue && rep.ProfileViewTimeout < curTime)
@@ -153,6 +159,25 @@ public class UserCleanupService : BackgroundService
             _logger.LogWarning(ex, "Error during pair request cleanup");
         }
     }
+
+    private void CleanupTemporaryPairs(SundouleiaDbContext dbContext)
+    {
+        try
+        {
+            _logger.LogInformation("Cleaning up temporary pairs");
+            var temporaryPairs = dbContext.ClientPairs.AsNoTracking().Where(p => p.IsTemporary).ToList();
+            // get the pairs that are expired.
+            var expiredPairs = temporaryPairs.Where(p => p.CreatedAt < DateTime.UtcNow - TimeSpan.FromHours(12));
+            // remove them.
+            _logger.LogInformation($"Removing [{expiredPairs.Count()}] expired temporary pairs");
+            dbContext.ClientPairs.RemoveRange(expiredPairs);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error during temporary pair cleanup");
+        }
+    }
+
 
     private void CleanUpTimedOutAccountAuthClaims(SundouleiaDbContext dbContext)
     {

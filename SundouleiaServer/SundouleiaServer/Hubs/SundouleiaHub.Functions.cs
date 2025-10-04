@@ -138,6 +138,7 @@ public partial class SundouleiaHub
                           {
                               UserUID = cp.UserUID, // Select UserUID
                               OtherUserUID = cp.OtherUserUID, // Select OtherUserUID
+                              IsTemporary = cp.IsTemporary,
                           };
 
         if (!clientPairs.Any())
@@ -175,6 +176,7 @@ public partial class SundouleiaHub
                                 OtherUserAlias = u.Alias,
                                 OtherUserTier = u.Tier,
                                 OtherUserCreatedDate = u.CreatedAt,
+                                IsTemporary = user.IsTemporary,
                                 OwnGlobalPerms = userGlobalPerm,
                                 OwnPermissions = ownperm,
                                 OtherGlobalPerms = otherUserGlobalPerm,
@@ -191,6 +193,7 @@ public partial class SundouleiaHub
             resultList[0].OtherUserAlias,
             resultList[0].OtherUserTier,
             resultList[0].OtherUserCreatedDate,
+            resultList[0].IsTemporary,
             resultList[0].OwnGlobalPerms,
             resultList[0].OwnPermissions,
             resultList[0].OtherGlobalPerms,
@@ -224,6 +227,7 @@ public partial class SundouleiaHub
                             {
                                 UserUID = cp.UserUID,
                                 OtherUserUID = cp.OtherUserUID,
+                                IsTemporary = cp.IsTemporary,
                             };
 
         // Obtain the permission info for these pairs.
@@ -267,6 +271,7 @@ public partial class SundouleiaHub
                             {
                                 UserUID = user.UserUID,
                                 OtherUserUID = user.OtherUserUID,
+                                IsTemporary = user.IsTemporary,
                                 OtherUserAlias = u.Alias,
                                 OtherUserVanity = u.Tier,
                                 OtherUserCreatedDate = u.CreatedAt,
@@ -289,6 +294,7 @@ public partial class SundouleiaHub
                 g.First().OtherUserAlias,
                 g.First().OtherUserVanity,
                 g.First().OtherUserCreatedDate,
+                g.First().IsTemporary,
                 g.First().OwnGlobalPerms,
                 g.First().OwnPermissions,
                 g.First().OtherGlobalPerms,
@@ -356,8 +362,8 @@ public partial class SundouleiaHub
     }
 
 
-    public record UserInfo(string Alias, CkVanityTier Tier, DateTime Created, GlobalPermissions OwnGlobals, 
-        ClientPairPermissions OwnPerms, GlobalPermissions OtherGlobals, ClientPairPermissions OtherPerms);
+    public record UserInfo(string Alias, CkVanityTier Tier, DateTime Created, bool IsTemporary,
+        GlobalPermissions OwnGlobals, ClientPairPermissions OwnPerms, GlobalPermissions OtherGlobals, ClientPairPermissions OtherPerms);
 }
 #pragma warning restore MA0016
 #nullable disable

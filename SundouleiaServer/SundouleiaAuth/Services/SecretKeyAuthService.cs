@@ -43,6 +43,7 @@ public class SecretKeyAuthService
         if (_failedAuthorizations.TryGetValue(ip, out var failedIpAuths)
         && failedIpAuths.FailedAttempts > _configurationService.GetValueOrDefault(nameof(AuthServiceConfig.FailedAuthForTempBan), 5))
         {
+            _logger.LogDebug($"Was in failed auths for {ip}, with {failedIpAuths.FailedAttempts} failed attempts.");
             // If reset task is null, do the temp ban thing.
             if (failedIpAuths.ResetTask is null)
             {
@@ -63,7 +64,10 @@ public class SecretKeyAuthService
         using var context = await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
         if (await context.Auth.Include(a => a.User).Include(a => a.AccountRep).AsNoTracking().SingleOrDefaultAsync(a => a.HashedKey == hashedSecretKey).ConfigureAwait(false) is not { } authReply)
+        {
+            _logger.LogDebug($"No auth found for secret key from {ip}, key: {hashedSecretKey}");
             return AuthenticationFailure(ip);
+        }
 
         // Finalize the reply.
         SecretKeyAuthReply reply = new(true, authReply.UserUID, authReply.PrimaryUserUID, authReply.User.Alias, false, authReply.AccountRep.IsBanned);

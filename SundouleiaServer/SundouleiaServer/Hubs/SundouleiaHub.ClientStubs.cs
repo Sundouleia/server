@@ -18,8 +18,8 @@ public partial class SundouleiaHub
     // --- Pair/Request Callbacks ---
     public Task Callback_AddPair(UserPair _) => throw new PlatformNotSupportedException(UnsupportedMessage);
     public Task Callback_RemovePair(UserDto _) => throw new PlatformNotSupportedException(UnsupportedMessage);
-    public Task Callback_AddRequest(PendingRequest _) => throw new PlatformNotSupportedException(UnsupportedMessage);
-    public Task Callback_RemoveRequest(PendingRequest _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_AddRequest(SundesmoRequest _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_RemoveRequest(SundesmoRequest _) => throw new PlatformNotSupportedException(UnsupportedMessage);
 
     // -- Moderation Utility Callbacks ---
     public Task Callback_Blocked(UserDto _) => throw new PlatformNotSupportedException(UnsupportedMessage);

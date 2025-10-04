@@ -116,10 +116,6 @@ public static class SharedDbFunctions
         await dbContext.Users.AddAsync(user).ConfigureAwait(false);
         await dbContext.AccountReputation.AddAsync(rep).ConfigureAwait(false);
         await dbContext.Auth.AddAsync(auth).ConfigureAwait(false);
-        
-        // Add AccountReputation if their primaryUid is their UserUid.
-        if (string.Equals(user.UID, auth.PrimaryUserUID, StringComparison.Ordinal))
-            await dbContext.AccountReputation.AddAsync(new AccountReputation { UserUID = user.UID }).ConfigureAwait(false);
 
         // Create all other necessary tables for the user now that it is added successfully.
         await dbContext.UserGlobalPerms.AddAsync(new GlobalPermissions { UserUID = user.UID }).ConfigureAwait(false);

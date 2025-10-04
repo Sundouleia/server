@@ -17,7 +17,7 @@ public class SundouleiaDbContext : DbContext
             return;
         }
 
-        optionsBuilder.UseNpgsql("Host=167.71.108.254;Port=5432;Database=sundouleia;Username=cksundouleia", builder =>
+        optionsBuilder.UseNpgsql("Host=51.222.107.111;Port=5432;Database=sundouleia;Username=cksundouleia", builder =>
         {
             builder.MigrationsHistoryTable("_efmigrationshistory", "public");
             builder.MigrationsAssembly("SundouleiaShared");
@@ -75,6 +75,7 @@ public class SundouleiaDbContext : DbContext
         modelBuilder.Entity<ClientPair>().HasKey(u => new { u.UserUID, u.OtherUserUID });
         modelBuilder.Entity<ClientPair>().HasIndex(c => c.UserUID);
         modelBuilder.Entity<ClientPair>().HasIndex(c => c.OtherUserUID);
+        modelBuilder.Entity<ClientPair>().HasIndex(c => c.IsTemporary);
         modelBuilder.Entity<ClientPairPermissions>().ToTable("client_pair_permissions");
         modelBuilder.Entity<ClientPairPermissions>().HasKey(u => new { u.UserUID, u.OtherUserUID });
         modelBuilder.Entity<ClientPairPermissions>().HasIndex(c => c.UserUID);

@@ -56,10 +56,10 @@ public static class Extensions
     public static UserData ToUserData(this User user)
         => new UserData(user.UID, user.Alias, user.Tier, user.CreatedAt);
 
-    public static PendingRequest ToApi(this PairRequest request)
-        => new PendingRequest(new(request.UserUID), new(request.OtherUserUID), request.IsTemporary, request.AttachedMessage, request.CreationTime);
+    public static SundesmoRequest ToApi(this PairRequest request)
+        => new SundesmoRequest(new(request.UserUID), new(request.OtherUserUID), request.IsTemporary, request.AttachedMessage, request.CreationTime);
 
-    public static PendingRequest ToApiRemoval(UserData user, UserData target) =>
+    public static SundesmoRequest ToApiRemoval(UserData user, UserData target) =>
         new(user, target, false, string.Empty, DateTime.MinValue);
 
     public static GlobalPerms ToApi(this GlobalPermissions? dbState)

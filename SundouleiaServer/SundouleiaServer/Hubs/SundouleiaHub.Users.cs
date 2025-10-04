@@ -14,7 +14,7 @@ namespace SundouleiaServer.Hubs;
 public partial class SundouleiaHub
 {
     [Authorize(Policy = "Identified")]
-    public async Task<HubResponse<PendingRequest>> UserSendRequest(CreateRequest dto)
+    public async Task<HubResponse<SundesmoRequest>> UserSendRequest(CreateRequest dto)
     {
         _logger.LogCallInfo(SundouleiaHubLogger.Args(dto));
         // The target to send the request to.
@@ -22,28 +22,28 @@ public partial class SundouleiaHub
 
         // Prevent sending requests to self.
         if (string.Equals(uid, UserUID, StringComparison.Ordinal))
-            return HubResponseBuilder.AwDangIt<PendingRequest>(SundouleiaApiEc.InvalidRecipient);
+            return HubResponseBuilder.AwDangIt<SundesmoRequest>(SundouleiaApiEc.InvalidRecipient);
 
         // Prevent sending to a user not registered in Sundouleia.
         if (await DbContext.Users.SingleOrDefaultAsync(u => u.UID == uid).ConfigureAwait(false) is not { } target)
         {
             await Clients.Caller.Callback_ServerMessage(MessageSeverity.Warning, $"Cannot send Request to {dto.User.UID}, they don't exist").ConfigureAwait(false);
-            return HubResponseBuilder.AwDangIt<PendingRequest>(SundouleiaApiEc.InvalidRecipient);
+            return HubResponseBuilder.AwDangIt<SundesmoRequest>(SundouleiaApiEc.InvalidRecipient);
         }
 
         // Sort the following calls by estimated tables with least entries to most entries for efficiency.
 
         // Prevent sending a request if either end has blocked the other.
         if (await DbContext.BlockedUsers.AnyAsync(p => (p.UserUID == UserUID && p.OtherUserUID == target.UID) || (p.UserUID == target.UID && p.OtherUserUID == UserUID)).ConfigureAwait(false))
-            return HubResponseBuilder.AwDangIt<PendingRequest>(SundouleiaApiEc.RecipientBlocked);
+            return HubResponseBuilder.AwDangIt<SundesmoRequest>(SundouleiaApiEc.RecipientBlocked);
 
         // Ensure that the request does not already exist in the database.
         if (await DbContext.Requests.AnyAsync(p => (p.UserUID == UserUID && p.OtherUserUID == target.UID) || (p.UserUID == target.UID && p.OtherUserUID == UserUID)).ConfigureAwait(false))
-            return HubResponseBuilder.AwDangIt<PendingRequest>(SundouleiaApiEc.RequestExists);
+            return HubResponseBuilder.AwDangIt<SundesmoRequest>(SundouleiaApiEc.RequestExists);
 
         // Prevent sending a request if already paired.
         if (await DbContext.ClientPairs.AnyAsync(p => (p.UserUID == UserUID && p.OtherUserUID == target.UID) || (p.UserUID == target.UID && p.OtherUserUID == UserUID)).ConfigureAwait(false))
-            return HubResponseBuilder.AwDangIt<PendingRequest>(SundouleiaApiEc.AlreadyPaired);
+            return HubResponseBuilder.AwDangIt<SundesmoRequest>(SundouleiaApiEc.AlreadyPaired);
 
         // Request is valid for sending, so retrieve the context callers user model.
         var callerUser = await DbContext.Users.SingleAsync(u => u.UID == UserUID).ConfigureAwait(false);
@@ -92,7 +92,7 @@ public partial class SundouleiaHub
 
         // Ensure that the request does not already exist in the database.
         if (await DbContext.Requests.SingleOrDefaultAsync(k => k.UserUID == UserUID && k.OtherUserUID == target.UID).ConfigureAwait(false) is not { } request)
-            return HubResponseBuilder.AwDangIt<PendingRequest>(SundouleiaApiEc.RequestExists);
+            return HubResponseBuilder.AwDangIt<SundesmoRequest>(SundouleiaApiEc.RequestExists);
 
         // Can cancel the request:
         var callerUser = await DbContext.Users.SingleAsync(u => u.UID == UserUID).ConfigureAwait(false);
@@ -136,6 +136,8 @@ public partial class SundouleiaHub
         if (await DbContext.Requests.SingleOrDefaultAsync(k => k.UserUID == target.UID && k.OtherUserUID == UserUID).ConfigureAwait(false) is not { } request)
             return HubResponseBuilder.AwDangIt<AddedUserPair>(SundouleiaApiEc.RequestNotFound);
 
+        var wasTempRequest = request.IsTemporary;
+
         // Must not be already paired. If you are, discard the request regardless, but return with error. 
         if (await DbContext.ClientPairs.AnyAsync(p => (p.UserUID == UserUID && p.OtherUserUID == target.UID) || (p.UserUID == target.UID && p.OtherUserUID == UserUID)).ConfigureAwait(false))
         {
@@ -146,8 +148,20 @@ public partial class SundouleiaHub
 
         // Request is properly accepted, create the relationship pair.
         var callerUser = await DbContext.Users.SingleAsync(u => u.UID == UserUID).ConfigureAwait(false);
-        var callerToRecipient = new ClientPair() { User = callerUser, OtherUser = target, };
-        var recipientToCaller = new ClientPair() { User = target, OtherUser = callerUser, };
+        var callerToRecipient = new ClientPair()
+        {
+            User = callerUser,
+            OtherUser = target,
+            CreatedAt = DateTime.UtcNow,
+            IsTemporary = wasTempRequest,
+        };
+        var recipientToCaller = new ClientPair()
+        {
+            User = target,
+            OtherUser = callerUser,
+            CreatedAt = DateTime.UtcNow,
+            IsTemporary = wasTempRequest,
+        };
         // Add them to the DB.
         await DbContext.ClientPairs.AddAsync(callerToRecipient).ConfigureAwait(false);
         await DbContext.ClientPairs.AddAsync(recipientToCaller).ConfigureAwait(false);
@@ -193,7 +207,7 @@ public partial class SundouleiaHub
         
         // Compile together the UserPair we will return to the caller.
         // This is the UserPair of the Caller (Request Accepter) -> Target (Request Creator)
-        var callerRetDto = new UserPair(target.ToUserData(), newOwnPerms.ToApi(), existingData!.OtherGlobals.ToApi(), newOtherPerms.ToApi());
+        var callerRetDto = new UserPair(target.ToUserData(), newOwnPerms.ToApi(), existingData!.OtherGlobals.ToApi(), newOtherPerms.ToApi(), existingData.IsTemporary);
 
         // Get if the request creator is online of not.
         var requesterIdentity = await GetUserIdent(uid).ConfigureAwait(false);
@@ -201,7 +215,7 @@ public partial class SundouleiaHub
         // If the request creator is online, send them the remove request and add pair callbacks, and also return sendOnline to both.
         if (requesterIdentity is not null)
         {
-            var requesterRetDto = new UserPair(callerUser.ToUserData(), newOtherPerms.ToApi(), existingData!.OwnGlobals.ToApi(), newOwnPerms.ToApi());
+            var requesterRetDto = new UserPair(callerUser.ToUserData(), newOtherPerms.ToApi(), existingData!.OwnGlobals.ToApi(), newOwnPerms.ToApi(), existingData.IsTemporary);
             await Clients.User(uid).Callback_RemoveRequest(Extensions.ToApiRemoval(new(uid), new(UserUID))).ConfigureAwait(false);
             await Clients.User(uid).Callback_AddPair(requesterRetDto).ConfigureAwait(false);
             await Clients.User(uid).Callback_UserOnline(new(callerUser.ToUserData(), UserCharaIdent)).ConfigureAwait(false);
@@ -233,7 +247,7 @@ public partial class SundouleiaHub
         // See if we need to return the rejection request to the requester if they are online.
         if (await GetUserIdent(dto.User.UID).ConfigureAwait(false) is not null)
         {
-            PendingRequest rejectedRequest = request.ToApi();
+            SundesmoRequest rejectedRequest = request.ToApi();
             await Clients.User(dto.User.UID).Callback_RemoveRequest(rejectedRequest).ConfigureAwait(false);
         }
 
@@ -243,6 +257,56 @@ public partial class SundouleiaHub
 
         _metrics.IncCounter(MetricsAPI.CounterRequestsRejected);
         _metrics.DecGauge(MetricsAPI.GaugeRequestsPending);
+        return HubResponseBuilder.Yippee();
+    }
+
+    [Authorize(Policy = "Identified")]
+    public async Task<HubResponse> UserBlock(UserDto dto)
+    {
+        _logger.LogCallInfo(SundouleiaHubLogger.Args(dto));
+        // Prevent blocking self.
+        if (string.Equals(dto.User.UID, UserUID, StringComparison.Ordinal))
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.InvalidRecipient);
+
+        // recipient must exist.
+        if (await DbContext.Users.AsNoTracking().SingleOrDefaultAsync(u => u.UID == dto.User.UID).ConfigureAwait(false) is not { } target)
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.InvalidRecipient);
+
+        // ensure the entry does not yet exist already.
+        if (await DbContext.BlockedUsers.AsNoTracking().AnyAsync(b => b.UserUID == UserUID && b.OtherUserUID == target.UID).ConfigureAwait(false))
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.RecipientBlocked);
+
+        // Create the block entry.
+        var callerUser = await DbContext.Users.SingleAsync(u => u.UID == UserUID).ConfigureAwait(false);
+        var blockEntry = new BlockedUser()
+        {
+            User = callerUser,
+            OtherUser = target,
+        };
+        await DbContext.BlockedUsers.AddAsync(blockEntry).ConfigureAwait(false);
+        await DbContext.SaveChangesAsync().ConfigureAwait(false);
+        _metrics.IncCounter(MetricsAPI.CounterUsersBlocked);
+        return HubResponseBuilder.Yippee();
+    }
+
+    /// <summary>
+    ///     Unblock a blocked user.
+    /// </summary>
+    public async Task<HubResponse> UserUnblock(UserDto user)
+    {
+        _logger.LogCallInfo(SundouleiaHubLogger.Args(user));
+        // Prevent target being self
+        if (string.Equals(user.User.UID, UserUID, StringComparison.Ordinal))
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.InvalidRecipient);
+
+        // Blocked Entry must exist.
+        if (await DbContext.BlockedUsers.AsNoTracking().SingleOrDefaultAsync(b => b.UserUID == UserUID && b.OtherUserUID == user.User.UID).ConfigureAwait(false) is not { } blockEntry)
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.InvalidRecipient);
+
+        // Remove the entry and save changes.
+        DbContext.BlockedUsers.Remove(blockEntry);
+        await DbContext.SaveChangesAsync().ConfigureAwait(false);
+        _metrics.IncCounter(MetricsAPI.CounterUsersUnblocked);
         return HubResponseBuilder.Yippee();
     }
 

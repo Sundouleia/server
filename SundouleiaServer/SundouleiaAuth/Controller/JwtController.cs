@@ -114,7 +114,7 @@ public class JwtController : Controller
     private async Task<IActionResult> AuthenticateInternal(string charaIdent, bool forceMain = false, string? auth = null, string? contentID = null)
     {
         try
-        {            
+        {
             // If this is empty, fail regardless of type.
             if (string.IsNullOrEmpty(charaIdent))
                 return BadRequest("No CharaIdent");
