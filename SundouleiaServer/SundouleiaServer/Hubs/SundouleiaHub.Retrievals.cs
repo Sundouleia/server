@@ -11,6 +11,7 @@ public partial class SundouleiaHub
     [Authorize(Policy = "Identified")]
     public async Task<List<OnlineUser>> UserGetOnlinePairs()
     {
+        _logger.LogCallInfo();
         var allPairedUsers = await GetPairedUnpausedUsers().ConfigureAwait(false);
         var pairs = await GetOnlineUsers(allPairedUsers).ConfigureAwait(false);
         // send that you are online to all connected online pairs of the client caller.
@@ -22,6 +23,7 @@ public partial class SundouleiaHub
     [Authorize(Policy = "Identified")]
     public async Task<List<UserPair>> UserGetAllPairs()
     {
+        _logger.LogCallInfo();
         var pairs = await GetAllPairInfo(UserUID).ConfigureAwait(false);
         // Convert the UserInfo objects returned into UserPair DTO's for transit.
         return pairs.Select(p =>
