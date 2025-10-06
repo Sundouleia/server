@@ -33,6 +33,7 @@
 	<ItemGroup>
 		<ProjectReference Include="..\..\SundouleiaAPI\SundouleiaAPI.csproj" />
 		<ProjectReference Include="..\SundouleiaShared\SundouleiaShared.csproj" />
+		<ProjectReference Include="..\SundouleiaFileHost\SundouleiaFileHost.csproj" />
 	</ItemGroup>
 
 </Project>
