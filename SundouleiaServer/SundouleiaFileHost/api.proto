@@ -1,5 +1,5 @@
 option go_package = "github.com/Sundouleia/filehost/rpc";
-option csharp_namespace = "Sundouleia.FileHost.API.Grpc";
+option csharp_namespace = "SundouleiaFileHost.Grpc";
 
 package filehost;
 

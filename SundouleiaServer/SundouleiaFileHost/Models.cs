@@ -1,4 +1,4 @@
-namespace Sundouleia.FileHost.API;
+namespace SundouleiaFileHost;
 
 /**
   SundouleiaFileHost - A distributed file hosting service.

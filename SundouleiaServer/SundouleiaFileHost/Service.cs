@@ -1,6 +1,6 @@
 ﻿using Grpc.Core.Interceptors;
 using Grpc.Net.Client;
-using Sundouleia.FileHost.API.Grpc;
+using SundouleiaFileHost.Grpc;
 
 /**
   SundouleiaFileHost - A distributed file hosting service.
@@ -20,12 +20,12 @@ using Sundouleia.FileHost.API.Grpc;
   along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-namespace Sundouleia.FileHost.API;
+namespace SundouleiaFileHost;
 
 // <summary>
 // Client for interacting with Sundouleia File Host API. Intended to be injected as a dependency in Hostbuilder applications.
 // </summary>
-public class Client : IClient, IDisposable
+public class Service : IFileHost, IDisposable
 {
 	private readonly GrpcChannel _channel;
 	private readonly FileHostAPI.FileHostAPIClient _client;
@@ -35,7 +35,7 @@ public class Client : IClient, IDisposable
 	// </summary>
 	// <param name="baseAddress">The base address of the Sundouleia File Host server (e.g., "https://files.example.com:8080").</param>
 	// <param name="psk">Pre-shared key for authenticating API requests.</param>
-	public Client(string baseAddress, string psk)
+	public Service(string baseAddress, string psk)
 	{
 #if DEBUG
 		AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
@@ -124,7 +124,7 @@ public class Client : IClient, IDisposable
 /// <summary>
 /// Interface for the Sundouleia File Host API client.
 /// </summary>
-public interface IClient
+public interface IFileHost
 {
 	Task<FileUrls> GetUploadUrlsAsync(IEnumerable<string> hashes);
 	FileUrls GetUploadUrls(IEnumerable<string> hashes);

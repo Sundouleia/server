@@ -19,7 +19,7 @@ using Grpc.Core.Interceptors;
   along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-namespace Sundouleia.FileHost.API;
+namespace SundouleiaFileHost;
 
 class AuthInterceptor : Interceptor
 {

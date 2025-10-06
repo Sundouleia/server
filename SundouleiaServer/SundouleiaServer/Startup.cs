@@ -1,3 +1,5 @@
+using System.Net;
+using System.Text;
 using MessagePack;
 using MessagePack.Resolvers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -20,10 +22,9 @@ using SundouleiaShared.RequirementHandlers;
 using SundouleiaShared.Services;
 using SundouleiaShared.Utils;
 using SundouleiaShared.Utils.Configuration;
-using System.Net;
-using System.Text;
 
 namespace SundouleiaServer;
+
 public class Startup
 {
     private readonly IConfiguration Configuration;
@@ -89,6 +90,10 @@ public class Startup
         services.AddSingleton<ServerTokenGenerator>();
         services.AddSingleton<SystemInfoService>();
         services.AddSingleton<RadarService>();
+        services.AddSingleton<SundouleiaFileHost.IFileHost>(x => new SundouleiaFileHost.Service(
+            sundouleiaConfig.GetValue<string>(nameof(SundouleiaConfigBase.FileHostAddress), string.Empty),
+            sundouleiaConfig.GetValue<string>(nameof(SundouleiaConfigBase.FileHostPsk), string.Empty)
+        ));
         services.AddHostedService(provider => provider.GetService<SystemInfoService>());
         _logger.LogInformation("System Info Service Hosted Service added");
 
@@ -176,7 +181,7 @@ public class Startup
 
         // otherwise, set the address and port to the IPEndpoint address and port
         if (endpoint is IPEndPoint ipEndPoint)
-        { 
+        {
             address = ipEndPoint.Address.ToString(); port = ipEndPoint.Port;
             logger.LogInformation("Redis Connection: {address}:{port}", address, port);
         }
