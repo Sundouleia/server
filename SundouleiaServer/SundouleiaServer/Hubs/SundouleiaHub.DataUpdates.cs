@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using SixLabors.ImageSharp;
@@ -7,6 +8,7 @@ using SundouleiaAPI.Data;
 using SundouleiaAPI.Enums;
 using SundouleiaAPI.Hub;
 using SundouleiaAPI.Network;
+using SundouleiaFileHost;
 using SundouleiaServer.Utils;
 using SundouleiaShared.Metrics;
 
@@ -20,54 +22,32 @@ public partial class SundouleiaHub
     // Pushes an update to mod and non-mod visual data to online pairs.
     // Currently non-functional.
     [Authorize(Policy = "Identified")]
-    public async Task<HubResponse> UserPushIpcFull(PushIpcFull dto)
+    public async Task<HubResponse> UserPushIpcFull(PushIpcFull dto,
+        [FromServices] IFileHost fileHost)
     {
         var recipientUids = dto.Recipients.Select(r => r.UID).ToList();
         _logger.LogCallInfo(SundouleiaHubLogger.Args(recipientUids.Count));
 
-        var requiresUpload = new List<ModFileInfo>();
-        var validModsToAdd = new List<ModFileData>();
-        foreach (var modToAdd in dto.Mods.NewModsToAdd)
-        {
-            // Should also be doing some extension check here likely.
-            // grab the upload link for the file with the hash and replaced path or whatever.
-            var dlLink = string.Empty;
-            if (string.IsNullOrEmpty(dlLink))
-                requiresUpload.Add(modToAdd);
-            else
-                validModsToAdd.Add(new(modToAdd.Hash, modToAdd.GamePaths, modToAdd.SwappedPath, dlLink));
-        }
-        var returnModDto = new RecievedModUpdate(validModsToAdd, dto.Mods.HashesToRemove);
+        (List<ModFileUpload> requiresUpload, RecievedModUpdate returnModDto) = await NewMethod(dto.Mods, fileHost).ConfigureAwait(false);
         await Clients.Users(recipientUids).Callback_IpcUpdateFull(new(new(UserUID), returnModDto, dto.Visuals)).ConfigureAwait(false);
-        
+
         _metrics.IncCounter(MetricsAPI.CounterDataUpdateAll);
         // Send back to the caller the files that still need to be uploaded.
-        return HubResponseBuilder.Yippee();
+        return HubResponseBuilder.Yippee(requiresUpload);
     }
 
     // Pushes an update to all mod visual data to online pairs.
     // Currently non-functional.
     [Authorize(Policy = "Identified")]
-    public async Task<HubResponse> UserPushIpcMods(PushIpcMods dto)
+    public async Task<HubResponse> UserPushIpcMods(PushIpcMods dto,
+        [FromServices] IFileHost fileHost)
     {
         var recipientUids = dto.Recipients.Select(r => r.UID).ToList();
         _logger.LogCallInfo(SundouleiaHubLogger.Args(recipientUids.Count));
 
-        var requiresUpload = new List<ModFileInfo>();
-        var validModsToAdd = new List<ModFileData>();
-        foreach (var modToAdd in dto.Mods.NewModsToAdd)
-        {
-            // Should also be doing some extension check here likely.
-            // grab the upload link for the file with the hash and replaced path or whatever.
-            var dlLink = string.Empty;
-            if (string.IsNullOrEmpty(dlLink))
-                requiresUpload.Add(modToAdd);
-            else
-                validModsToAdd.Add(new(modToAdd.Hash, modToAdd.GamePaths, modToAdd.SwappedPath, dlLink));
-        }
-        var returnModDto = new RecievedModUpdate(validModsToAdd, dto.Mods.HashesToRemove);
+        (List<ModFileUpload> requiresUpload, RecievedModUpdate returnModDto) = await NewMethod(dto.Mods, fileHost).ConfigureAwait(false);
         await Clients.Users(recipientUids).Callback_IpcUpdateMods(new(new(UserUID), returnModDto)).ConfigureAwait(false);
-        
+
         _metrics.IncCounter(MetricsAPI.CounterDataUpdateMods);
         // Send back to the caller the files that still need to be uploaded.
         return HubResponseBuilder.Yippee();
@@ -166,6 +146,29 @@ public partial class SundouleiaHub
         await Clients.Users(onlineUids).Callback_ProfileUpdated(new(new(UserUID))).ConfigureAwait(false);
         _metrics.IncCounter(MetricsAPI.CounterProfileUpdates);
         return HubResponseBuilder.Yippee();
+    }
+
+    private static async Task<(List<ModFileUpload> requiresUpload, RecievedModUpdate returnModDto)> NewMethod(SentModUpdate mods, IFileHost fileHost)
+    {
+        var urlInfo = await fileHost.GetUploadUrlsAsync(mods.NewModsToAdd.Select(m => m.Hash)).ConfigureAwait(false);
+
+        var requiresUpload = new List<ModFileUpload>();
+        var validModsToAdd = new List<ModFileData>();
+        foreach (var modToAdd in mods.NewModsToAdd)
+        {
+            // Should also be doing some extension check here likely.
+            // grab the upload link for the file with the hash and replaced path or whatever.
+            if (urlInfo.DownloadUrl.TryGetValue(modToAdd.Hash, out var dlLink))
+            {
+                validModsToAdd.Add(new(modToAdd.Hash, modToAdd.GamePaths, modToAdd.SwappedPath, dlLink));
+            }
+            else if (urlInfo.UploadUrl.TryGetValue(modToAdd.Hash, out var ulLink))
+            {
+                requiresUpload.Add(new(modToAdd.Hash, modToAdd.GamePaths, modToAdd.SwappedPath, ulLink));
+            }
+        }
+        var returnModDto = new RecievedModUpdate(validModsToAdd, mods.HashesToRemove);
+        return (requiresUpload, returnModDto);
     }
 
 }

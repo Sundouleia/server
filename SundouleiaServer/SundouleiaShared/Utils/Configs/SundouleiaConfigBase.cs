@@ -13,12 +13,14 @@ public class SundouleiaConfigBase : ISundouleiaConfiguration
     public int RedisPool { get; set; } = 50;            // the size of the redi's pool. This means that 
     public string RedisConnectionString { get; set; } = string.Empty; // The connection string for the redis server
     public string ShardName { get; set; } = string.Empty; // The name of the shard
-    
+    public string FileHostAddress { get; set; } = string.Empty; // The address of the file host server, e.g. https://sundouleia.example.com/filehost
+    public string FileHostPsk { get; set; } = string.Empty; // The pre-shared key for the file host server
+
     // get the value of the key
     public T GetValue<T>(string key)
     {
         var prop = GetType().GetProperty(key);
-        if (prop is null) 
+        if (prop is null)
             throw new KeyNotFoundException(key);
         if (prop.PropertyType != typeof(T))
             throw new ArgumentException($"Requested {key} with T:{typeof(T)}, where {key} is {prop.PropertyType}", nameof(key));
@@ -56,6 +58,9 @@ public class SundouleiaConfigBase : ISundouleiaConfiguration
         sb.AppendLine($"{nameof(MetricsPort)} => {MetricsPort}");
         sb.AppendLine($"{nameof(RedisPool)} => {RedisPool}");
         sb.AppendLine($"{nameof(RedisConnectionString)} => {RedisConnectionString}");
+        sb.AppendLine($"{nameof(ShardName)} => {ShardName}");
+        sb.AppendLine($"{nameof(FileHostAddress)} => {FileHostAddress}");
+        sb.AppendLine($"{nameof(FileHostPsk)} => {(string.IsNullOrEmpty(FileHostPsk) ? "(not set)" : "(set)")}");
         return sb.ToString();
     }
 }

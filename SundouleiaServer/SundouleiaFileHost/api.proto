@@ -1,0 +1,30 @@
+option go_package = "github.com/Sundouleia/filehost/rpc";
+option csharp_namespace = "SundouleiaFileHost.Grpc";
+
+package filehost;
+
+service FileHostAPI {
+	rpc AuthorizeDownloads(AuthorizeDownloadsRequest) returns (AuthorizeDownloadsResponse) {}
+	rpc AuthorizeUploads(AuthorizeUploadsRequest) returns (AuthorizeUploadsResponse) {}
+	rpc ShardAuthorizeDownloads(AuthorizeDownloadsRequest) returns (AuthorizeDownloadsResponse) {}
+	rpc ShardAuthorizeUploads(AuthorizeUploadsRequest) returns (AuthorizeUploadsResponse) {}
+}
+
+message AuthorizeDownloadsRequest {
+	repeated string hashes = 1;
+}
+
+message AuthorizeDownloadsResponse {
+	map<string, string> download_urls = 1;
+	required int32 ttl = 3;
+}
+
+message AuthorizeUploadsRequest {
+	repeated string hashes = 1;
+}
+
+message AuthorizeUploadsResponse {
+	map<string, string> upload_urls = 1;
+	map<string, string> download_urls = 2;
+	required int32 ttl = 3;
+}
