@@ -90,7 +90,8 @@ public class Startup
         services.AddSingleton<ServerTokenGenerator>();
         services.AddSingleton<SystemInfoService>();
         services.AddSingleton<RadarService>();
-        services.AddSingleton<SundouleiaFileHost.IFileHost>(x => new SundouleiaFileHost.Service(
+        // Update later to be interfaced with the shared service.
+        services.AddSingleton<SundouleiaFileHost.IFileHost>(x => new SundouleiaFileHost.FileHostService(
             sundouleiaConfig.GetValue<string>(nameof(SundouleiaConfigBase.FileHostAddress), string.Empty),
             sundouleiaConfig.GetValue<string>(nameof(SundouleiaConfigBase.FileHostPsk), string.Empty)
         ));

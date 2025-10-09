@@ -375,4 +375,17 @@ public partial class SundouleiaHub
 
         return HubResponseBuilder.Yippee();
     }
+
+    /// <summary>
+    ///     Triggered whenever a sundesmo unloads the plugin or hard reconnects from the server. <para />
+    ///     Not triggered on normal reconnections or soft disconnects.
+    /// </summary>
+    /// <remarks> Could pass in the online paired UID's to avoid the extra lookup. </remarks>
+    [Authorize(Policy = "Identified")]
+    public async Task<HubResponse> UserNotifyIsUnloading()
+    {
+        _logger.LogCallInfo(SundouleiaHubLogger.Args());
+        await SendIsUnloadingToAllPairedUsers().ConfigureAwait(false);
+        return HubResponseBuilder.Yippee();
+    }
 }

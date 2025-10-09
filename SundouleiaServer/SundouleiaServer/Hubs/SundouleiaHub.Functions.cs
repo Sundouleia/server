@@ -58,12 +58,18 @@ public partial class SundouleiaHub
             StackExchange.Redis.When.Always, StackExchange.Redis.CommandFlags.FireAndForget).ConfigureAwait(false);
     }
 
+    private async Task<List<string>> SendIsUnloadingToAllPairedUsers()
+    {
+        var pairedUids = await GetPairedUnpausedUsers().ConfigureAwait(false);
+        var self = await DbContext.Users.AsNoTracking().SingleAsync(u => u.UID == UserUID).ConfigureAwait(false);
+        await Clients.Users(pairedUids).Callback_UserIsUnloading(new(self.ToUserData())).ConfigureAwait(false);
+        return pairedUids;
+    }
+
     /// <summary> 
     ///     Sends Callback_UserOffline to all paired online users of the client caller.
     /// </summary>
-    /// <returns>
-    ///     The list of UID's the callbacks were sent to.
-    /// </returns>
+    /// <returns> The list of UID's the callbacks were sent to. </returns>
     private async Task<List<string>> SendOfflineToAllPairedUsers()
     {
         var pairedUids = await GetPairedUnpausedUsers().ConfigureAwait(false);

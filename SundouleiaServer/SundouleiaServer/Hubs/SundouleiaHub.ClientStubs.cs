@@ -42,6 +42,7 @@ public partial class SundouleiaHub
 
 
     // --- User Status Update Callbacks ---
+    public Task Callback_UserIsUnloading(UserDto _) => throw new PlatformNotSupportedException(UnsupportedMessage);
     public Task Callback_UserOffline(UserDto _) => throw new PlatformNotSupportedException(UnsupportedMessage);
     public Task Callback_UserOnline(OnlineUser _) => throw new PlatformNotSupportedException(UnsupportedMessage);
     public Task Callback_ProfileUpdated(UserDto _) => throw new PlatformNotSupportedException(UnsupportedMessage);

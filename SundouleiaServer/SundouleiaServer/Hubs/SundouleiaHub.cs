@@ -5,6 +5,7 @@ using StackExchange.Redis.Extensions.Core.Abstractions;
 using SundouleiaAPI.Enums;
 using SundouleiaAPI.Hub;
 using SundouleiaAPI.Network;
+using SundouleiaFileHost;
 using SundouleiaServer.Services;
 using SundouleiaServer.Utils;
 using SundouleiaShared.Data;
@@ -30,6 +31,7 @@ public partial class SundouleiaHub : Hub<ISundouleiaHub>, ISundouleiaHub
     private readonly SystemInfoService _systemInfoService;
     private readonly IHttpContextAccessor _contextAccessor;
     private readonly IRedisDatabase _redis;
+    private readonly IFileHost _fileHost;
 
     // Lazily initialized DbContext generated on initialization.
     // Does not technically need to be lazy as it is not modified, but useful to have.
@@ -46,14 +48,16 @@ public partial class SundouleiaHub : Hub<ISundouleiaHub>, ISundouleiaHub
         RadarService radarService,
         SystemInfoService systemInfoService,
         IRedisDatabase redis,
-        IHttpContextAccessor contextAccessor)
+        IHttpContextAccessor contextAccessor,
+        IFileHost fileHost)
     {
         _logger = new SundouleiaHubLogger(this, logger);
         _metrics = metrics;
         _radarService = radarService;
         _systemInfoService = systemInfoService;
-        _contextAccessor = contextAccessor;
         _redis = redis;
+        _contextAccessor = contextAccessor;
+        _fileHost = fileHost;
         _dbContextLazy = new Lazy<SundouleiaDbContext>(() => dbFactory.CreateDbContext());
 
         _expectedClientVersion = config.GetValueOrDefault(nameof(ServerConfig.ExpectedClientVersion), new Version(0, 0, 0));

@@ -25,7 +25,7 @@ namespace SundouleiaFileHost;
 // <summary>
 // Client for interacting with Sundouleia File Host API. Intended to be injected as a dependency in Hostbuilder applications.
 // </summary>
-public class Service : IFileHost, IDisposable
+public class FileHostService : IFileHost, IDisposable
 {
 	private readonly GrpcChannel _channel;
 	private readonly FileHostAPI.FileHostAPIClient _client;
@@ -35,7 +35,7 @@ public class Service : IFileHost, IDisposable
 	// </summary>
 	// <param name="baseAddress">The base address of the Sundouleia File Host server (e.g., "https://files.example.com:8080").</param>
 	// <param name="psk">Pre-shared key for authenticating API requests.</param>
-	public Service(string baseAddress, string psk)
+	public FileHostService(string baseAddress, string psk)
 	{
 #if DEBUG
 		AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
