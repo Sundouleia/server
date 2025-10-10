@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using SundouleiaAPI.Data;
 using SundouleiaAPI.Enums;
 using SundouleiaShared.Models;
 using SundouleiaShared.Utils;
@@ -8,10 +9,43 @@ namespace SundouleiaServer.Hubs;
 #nullable enable
 public partial class SundouleiaHub
 {
+    protected static readonly string[] ValidFileTypes = { ".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".pbd", ".scd", ".skp", ".shpk" };
+
     // The context user claims associated with signalR callers for Sundouleia
     public string UserCharaIdent => Context.User?.Claims?.SingleOrDefault(c => string.Equals(c.Type, SundouleiaClaimTypes.CharaIdent, StringComparison.Ordinal))?.Value ?? throw new Exception("No Chara Ident in Claims");
     public string UserUID => Context.User?.Claims?.SingleOrDefault(c => string.Equals(c.Type, SundouleiaClaimTypes.Uid, StringComparison.Ordinal))?.Value ?? throw new Exception("No UID in Claims");
     public string UserHasTempAccess => Context.User?.Claims?.SingleOrDefault(c => string.Equals(c.Type, SundouleiaClaimTypes.AccessType, StringComparison.Ordinal))?.Value ?? throw new Exception("No TempAccess in Claims");
+
+    /// <summary>
+    ///     Requests the file download links from the file host for the specified mod files. <para />
+    ///     The FileHost will return download links for any that exist, and authorized upload links for those that do not. <para />
+    ///     These are both returned in the resulting record, and should be handled accordingly.
+    /// </summary>
+    private async Task<ModFileUrlResult> RequestFiles(List<ModFile> newMods)
+    {
+        // could remove any invalid extensions from the initial list before passing in the request to filter out invalid filetypes.
+        // This is already handled within the client but should be handled on the server as well for proper validity.
+
+        // Retrieve the upload URLs and download URLs for the new mods via their hashes.
+        var urlInfo = await _fileHost.GetUploadUrlsAsync(newMods.Select(m => m.Hash)).ConfigureAwait(false);
+
+        // These contain the authorized upload links to send back to the client caller.
+        var requiresUpload = new List<VerifiedModFile>();
+        // These are able to be called back to the recipient UID's.
+        var validMods = new List<VerifiedModFile>();
+
+        // Iterate through all of the new mods and filter them accordingly based on their resulting dictionary outcomes.
+        foreach (var modToAdd in newMods)
+        {
+            if (urlInfo.DownloadUrl.TryGetValue(modToAdd.Hash, out var dlLink))
+                validMods.Add(new(modToAdd.Hash, dlLink, modToAdd.GamePaths, modToAdd.SwappedPath));
+            else if (urlInfo.UploadUrl.TryGetValue(modToAdd.Hash, out var ulLink))
+                requiresUpload.Add(new(modToAdd.Hash, ulLink, modToAdd.GamePaths, modToAdd.SwappedPath));
+        }
+        // return the record containing the resulting lists.
+        return new(validMods, requiresUpload);
+    }
+
 
     /// <summary>
     ///     Gets all unpaused pairs of <paramref name="uid"/>. <para />
