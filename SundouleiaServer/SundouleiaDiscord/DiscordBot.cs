@@ -11,7 +11,6 @@ using SundouleiaDiscord.Commands;
 using SundouleiaDiscord.Modules.AccountWizard;
 using SundouleiaServer.Hubs;
 using SundouleiaShared.Data;
-using SundouleiaShared.Models;
 using SundouleiaShared.Services;
 using DiscordConfig = SundouleiaShared.Utils.Configuration.DiscordConfig;
 
@@ -56,6 +55,30 @@ internal partial class DiscordBot : IHostedService
         // subscribe to the log event from discord.
         _discordClient.Log += Log;
     }
+
+    // Map role names from both servers
+    public static readonly Dictionary<string, CkVanityTier> RoleToVanityTier = new Dictionary<string, CkVanityTier>(StringComparer.Ordinal)
+    {
+        { "Corby", CkVanityTier.ShopKeeper },
+        { "Distinguished Connoisseur", CkVanityTier.DistinguishedConnoisseur },
+        { "Tier 3 (CK)", CkVanityTier.DistinguishedConnoisseur },
+        { "Esteemed Patron", CkVanityTier.EsteemedPatron },
+        { "Tier 2 (CK)", CkVanityTier.EsteemedPatron },
+        { "Server Booster", CkVanityTier.ServerBooster },
+        { "Illustrious Supporter", CkVanityTier.IllustriousSupporter },
+        { "Tier 1 (CK)", CkVanityTier.IllustriousSupporter }
+    };
+
+    // Map CK role names to all Sundouleia role names they should match
+    public static readonly Dictionary<string, string[]> CkToSundRoles = new(StringComparer.Ordinal)
+    {
+        { "Distinguished Connoisseur", new[] { "Distinguished Connoisseur", "Tier 3 (CK)" } },
+        { "Esteemed Patron", new[] { "Esteemed Patron", "Tier 2 (CK)" } },
+        { "Illustrious Supporter", new[] { "Illustrious Supporter", "Tier 1 (CK)" } },
+    };
+
+    public static readonly IEnumerable<string> SundouleiaCkSupporters = [ "Tier 3 (CK)", "Tier 2 (CK)", "Tier 1 (CK)" ];
+
 
     // As this is a hosted service, this fires immediately upon program start.
     public async Task StartAsync(CancellationToken ct)
@@ -152,14 +175,10 @@ internal partial class DiscordBot : IHostedService
         }
 
         // If the ckGuild is not null, then we can process vanity perks by merging perks from CK & Sundouleia.
-        if (ckGuild is null)
+        if (ckGuild is null || sundouleiaGuild is null)
             return;
 
-        _ = UpdateVanityRoles(ckGuild, _updateStatusCts.Token);
-
-        if (sundouleiaGuild is null)
-            return;
-
+        _ = UpdateVanityRoles(sundouleiaGuild, ckGuild, _updateStatusCts.Token);
         _ = AddPerksToUsersWithVanityRole(sundouleiaGuild, ckGuild, _updateStatusCts.Token);
         _ = RemovePerksFromUsersNotInVanityRole(sundouleiaGuild, ckGuild, _updateStatusCts.Token);
     }
@@ -206,18 +225,16 @@ internal partial class DiscordBot : IHostedService
     {
         // construct the embed builder
         EmbedBuilder eb = new EmbedBuilder();
-        eb.WithTitle("CK's Sundouleia Bot Service");
-        eb.WithDescription("Press \"Start\" to interact with me!" + Environment.NewLine + Environment.NewLine
-            + "You can handle all of your Sundouleia account needs in this server.\nJust follow the instructions!");
-        eb.WithThumbnailUrl("https://raw.githubusercontent.com/CordeliaMist/Sundouleia-Client/main/images/iconUI.png");
-        
+        eb.WithTitle("Sundouleia Account Service");
+        eb.WithDescription("To Register an Account or manage your account profiles, use the button below!");
+        eb.WithColor(Color.Gold);
+        eb.WithThumbnailUrl("https://raw.githubusercontent.com/Sundouleia/repo/main/Images/icon.png");
         // construct the buttons
         ComponentBuilder cb = new ComponentBuilder();
         
         // this claim your account button will trigger the custom id of wizard-home:true, letting the bot deliver a personalized reply
         // that will display the account information.
-        cb.WithButton("Start Sundouleia Account Management", style: ButtonStyle.Primary, customId: "wizard-home:true", emote: Emoji.Parse("🎀"));
-        
+        cb.WithButton("Open Account Management", style: ButtonStyle.Primary, customId: "wizard-home:true", emote: Emoji.Parse("🗝️"));
         // if the previous message is null, then send the message and try and pin it.
         if (prevMessage is null)
         {
@@ -281,16 +298,14 @@ internal partial class DiscordBot : IHostedService
     ///     Updates the vanity roles in the concurrent dictionary for the bot services to 
     ///     reflect the list in the appsettings.json <para />
     /// </summary>
-    private async Task UpdateVanityRoles(RestGuild sundouleiaGuild, CancellationToken token)
+    private async Task UpdateVanityRoles(RestGuild sundouleiaGuild, RestGuild ckGuild, CancellationToken token)
     {
         while (!token.IsCancellationRequested)
         {
             try
             {
-                _logger.LogInformation("Updating Vanity Roles From Config File");
-                // fetch the roles from the configuration list.
+                _logger.LogInformation("Updating Sundouleia VanityRoles From Config");
                 Dictionary<ulong, string> vanityRoles = _discordConfig.GetValueOrDefault(nameof(DiscordConfig.VanityRoles), new Dictionary<ulong, string>());
-                
                 // if the vanity roles are not the same as the list fetched from the bot service,
                 if (vanityRoles.Keys.Count != _botServices.VanityRoles.Count)
                 {
@@ -298,11 +313,28 @@ internal partial class DiscordBot : IHostedService
                     _botServices.VanityRoles.Clear();
                     foreach (KeyValuePair<ulong, string> role in vanityRoles)
                     {
-                        _logger.LogDebug($"Adding Role: {role.Key} => {role.Value}");
-                        // add the ID and the name of the role to the bot service.
-                        var restRole = sundouleiaGuild.GetRole(role.Key);
-                        if (restRole is not null) 
+                        if (sundouleiaGuild.GetRole(role.Key) is { } restRole)
+                        {
                             _botServices.VanityRoles.Add(restRole, role.Value);
+                            _logger.LogDebug($"Adding Sundouleia Role: {role.Key} => {role.Value}");
+                        }
+                    }
+                }
+
+                _logger.LogInformation("Updating CK VanityRoles From Config");
+                Dictionary<ulong, string> ckVanityRoles = _discordConfig.GetValueOrDefault(nameof(DiscordConfig.CkVanityRoles), new Dictionary<ulong, string>());
+                // if the vanity roles are not the same as the list fetched from the bot service,
+                if (ckVanityRoles.Keys.Count != _botServices.CkVanityRoles.Count)
+                {
+                    // clear the roles in the bot service, and create a new list with the correct roles.
+                    _botServices.CkVanityRoles.Clear();
+                    foreach (KeyValuePair<ulong, string> role in ckVanityRoles)
+                    {
+                        if (ckGuild.GetRole(role.Key) is { } restRole)
+                        {
+                            _botServices.CkVanityRoles.Add(restRole, role.Value);
+                            _logger.LogDebug($"Adding CK Role: {role.Key} => {role.Value}");
+                        }
                     }
                 }
                 // could shorten this if you want, but i prefer to avoid spam.
@@ -316,11 +348,8 @@ internal partial class DiscordBot : IHostedService
     }
 
     /// <summary>
-    ///     Helps assign vanity perks to any users with an appropriate vanity role,
-    ///     and assigns them the perks. <para />
-    ///     
-    ///     Note that this update vanity roles is a bit special, since it pulls donator roles from 
-    ///     Ck and applies them as donor roles too. (Still a WIP)
+    ///     Takes any any verified claimed account with sundouleia, checks against their roles, and adds perks accordingly. <para />
+    ///     This also will apply any missing roles to users with perks in the CkGuid prior to operation.
     /// </summary>
     private async Task AddPerksToUsersWithVanityRole(RestGuild sundouleiaGuild, RestGuild ckGuid, CancellationToken token)
     {
@@ -328,69 +357,98 @@ internal partial class DiscordBot : IHostedService
         {
             try
             {
-                _logger.LogInformation("Adding VanityRoles to Active Supporters of CK");
-                // get the list of allowed roles that should have vanity UID's from the Vanity Roles in the discord configuration.
-                Dictionary<ulong, string> allowedRoleIds = _discordConfig.GetValueOrDefault(nameof(DiscordConfig.VanityRoles), new Dictionary<ulong, string>());
+                _logger.LogDebug("Grabbing supporter roles from both discords.");
+                Dictionary<ulong, string> sundouleiaRoles = _discordConfig.GetValueOrDefault(nameof(DiscordConfig.VanityRoles), new Dictionary<ulong, string>());
+                Dictionary<ulong, string> ckRoles = _discordConfig.GetValueOrDefault(nameof(DiscordConfig.CkVanityRoles), new Dictionary<ulong, string>());
+                var sundouleiaRoleToId = sundouleiaRoles.ToDictionary(kvp => kvp.Value, kvp => kvp.Key, StringComparer.Ordinal);
 
-                // await the creation of a scope for this service
                 using var scope = _services.CreateAsyncScope();
-                // fetch the sundouleiaDatabaseContext from the database
                 using (var db = scope.ServiceProvider.GetRequiredService<SundouleiaDbContext>())
                 {
-                    // Create a dictionary to map role names to CkVanityTier values
-                    var roleNameToTier = new Dictionary<string, CkVanityTier>(StringComparer.Ordinal)
-                    {
-                        // The roles from CK.
-                        { "Kinkporium Mistress", CkVanityTier.KinkporiumMistress },
-                        { "Distinguished Connoisseur", CkVanityTier.DistinguishedConnoisseur },
-                        { "Esteemed Patron", CkVanityTier.EsteemedPatron },
-                        { "Server Booster", CkVanityTier.ServerBooster },
-                        { "Illustrious Supporter", CkVanityTier.IllustriousSupporter }
-
-                        // Should also have roles for Sundouleia too. (WIP)
-                    };
-
-                    // Narrow down the list to only user with verified accounts that have no supporter role.
-                    var verifiedAccountsWithNoPerks = await db.AccountReputation.Include(r => r.User).AsNoTracking()
-                        .Where(r => r.User != null && r.IsVerified && r.User.Tier == CkVanityTier.NoRole)
+                    // Obtain all verified sundouleia accounts to narrow our search.
+                    var verifiedUsersWithoutPerks = await db.AccountReputation.Include(r => r.User).AsNoTracking()
+                        .Where(r => r.IsVerified && r.User.Tier == CkVanityTier.NoRole)
                         .ToListAsync()
                         .ConfigureAwait(false);
 
-                    // Check to see if any valid accounts currently have any discord roles.
-                    foreach (var validAccount in verifiedAccountsWithNoPerks)
+                    _logger.LogDebug($"Found {verifiedUsersWithoutPerks.Count} verified users without perks.");
+
+                    // Run a loop to check each of these users with some delay to avoid rate limiting.
+                    // For each check, ensure they have a valid accountClaimAuth.
+                    foreach (var verifiedAccount in verifiedUsersWithoutPerks)
                     {
-                        // grab the discord user.
-                        var discordId = await db.AccountClaimAuth.AsNoTracking().SingleAsync(a => a.User!.UID == validAccount.UserUID).ConfigureAwait(false);
-                        var discordUser = await sundouleiaGuild.GetUserAsync(discordId.DiscordId).ConfigureAwait(false);
-
-                        // See if the user has any roles.
-                        if (discordUser is not null && discordUser.RoleIds.Any(allowedRoleIds.Keys.Contains))
+                        // Ensure they have a valid auth claim (should be unnecessary but never know.
+                        if (await db.AccountClaimAuth.AsNoTracking().Include(a => a.User).SingleOrDefaultAsync(a => a.User != null && a.User.UID == verifiedAccount.UserUID).ConfigureAwait(false) is not { } authClaim)
                         {
-                            // fetch the roles they have, and output them.
-                            _logger.LogInformation($"User {validAccount!.User!.UID} has roles: {string.Join(", ", discordUser.RoleIds)}");
-                            // Determine the highest priority role
-                            CkVanityTier highestRole = discordUser.RoleIds
-                                .Where(allowedRoleIds.ContainsKey)
-                                .Select(id => roleNameToTier[allowedRoleIds[id]])
-                                .OrderByDescending(tier => tier)
-                                .FirstOrDefault();
-
-                            // Assign Highest role found.
-                            validAccount.User.Tier = highestRole;
-                            db.Update(validAccount.User);
-                            _logger.LogInformation($"User {validAccount.User.UID} assigned to tier {highestRole} (highest role)");
-
-                            // Update this on all secondary accounts of this user.
-                            var altProfiles = await db.Auth.Include(a => a.User).AsNoTracking().Where(a => a.PrimaryUserUID == validAccount.User.UID).ToListAsync().ConfigureAwait(false);
-                            foreach (var profile in altProfiles)
-                            {
-                                _logger.LogDebug($"AltProfile [{profile.User.UID}] also given this perk!");
-                                profile.User.Tier = highestRole;
-                                db.Update(profile.User);
-                            }
+                            _logger.LogWarning($"Somehow was a verified account without an auth claim? Report this if seen!");
+                            continue;
                         }
-                        // await for the database to save changes
-                        await db.SaveChangesAsync().ConfigureAwait(false);
+
+                        try
+                        {
+                            // grab the discord user from sundouleia.
+                            if (await sundouleiaGuild.GetUserAsync(authClaim.DiscordId).ConfigureAwait(false) is not { } sundouleiaUser)
+                            {
+                                _logger.LogWarning($"Could not find discord user [{authClaim.DiscordId}] in Sundouleia guild.");
+                                await Task.Delay(250, token).ConfigureAwait(false);
+                                continue;
+                            }
+
+                            // If they do not contain any roles, check if they have any roles in ck first, and if they do, assign them.
+                            if (!sundouleiaUser.RoleIds.Any(sundouleiaRoles.Keys.Contains))
+                            {
+                                // Scope into ck and check their user there.
+                                if (await ckGuid.GetUserAsync(authClaim.DiscordId).ConfigureAwait(false) is { } ckUser)
+                                {
+                                    // get their roleIds.
+                                    var roleIds = ckUser.RoleIds;
+                                    _logger.LogInformation($"User {authClaim.User!.UID} has CK Roles: {string.Join(", ", roleIds)}");
+                                    // Determine the highest role to check against by it's priority.
+                                    var highestRoleId = roleIds.Where(ckRoles.ContainsKey).OrderByDescending(id => RoleToVanityTier[ckRoles[id]]).FirstOrDefault();
+                                    // Get the string name of this role.
+                                    if (ckRoles.TryGetValue(highestRoleId, out var priorityRole) && CkToSundRoles.TryGetValue(priorityRole, out var matchingSundRoles))
+                                    {
+                                        // Assign all matching sundouleiaRoles to the user.
+                                        var rolesToAssign = matchingSundRoles.Select(r => sundouleiaRoleToId[r]).ToList();
+                                        await sundouleiaUser.AddRolesAsync(rolesToAssign).ConfigureAwait(false);
+                                        _logger.LogInformation($"Assigned Roles from Ck Supporter {authClaim.User!.UID} assigned roles: {string.Join(", ", matchingSundRoles)}");
+                                    }
+                                }
+                            }
+
+                            // Now we should check their roles in sundouleia, and assign the highest role they have.
+                            if (sundouleiaUser.RoleIds.Any(sundouleiaRoles.Keys.Contains))
+                            {
+                                // fetch the roles they have, and output them.
+                                _logger.LogInformation($"User {authClaim.User!.UID} has roles: {string.Join(", ", sundouleiaUser.RoleIds)}");
+                                // Determine the highest priority role
+                                CkVanityTier highestRole = sundouleiaUser.RoleIds
+                                    .Where(sundouleiaRoles.ContainsKey)
+                                    .Select(id => RoleToVanityTier[sundouleiaRoles[id]])
+                                    .OrderByDescending(tier => tier)
+                                    .FirstOrDefault();
+
+                                // Assign Highest role found.
+                                authClaim.User.Tier = highestRole;
+                                db.Update(authClaim.User);
+                                _logger.LogInformation($"User {authClaim.User.UID} assigned to tier {highestRole} (highest role)");
+
+                                // Update this on all secondary accounts of this user.
+                                var altProfiles = await db.Auth.Include(a => a.User).Where(a => a.PrimaryUserUID == authClaim.User.UID).ToListAsync().ConfigureAwait(false);
+                                foreach (var profile in altProfiles)
+                                {
+                                    _logger.LogDebug($"AltProfile [{profile.User.UID}] also given this perk!");
+                                    profile.User.Tier = highestRole;
+                                    db.Update(profile.User);
+                                }
+                            }
+                            // await for the database to save changes
+                            await db.SaveChangesAsync().ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError($"Error processing user for perks: {ex}");
+                        }
                         // await a second before checking the next user
                         await Task.Delay(1000, token).ConfigureAwait(false);
                     }
@@ -405,7 +463,6 @@ internal partial class DiscordBot : IHostedService
             _logger.LogInformation("Supporter Perks for UID's Assigned");
             await Task.Delay(TimeSpan.FromHours(2), token).ConfigureAwait(false);
         }
-
     }
 
     /// <summary> 
@@ -421,56 +478,69 @@ internal partial class DiscordBot : IHostedService
             try
             {
                 _logger.LogInformation($"Cleaning up Vanity UIDs from Sundouleia [{sundouleiaGuild.Name}]");
-                // get the list of allowed roles that should have vanity UID's from the Vanity Roles in the discord configuration.
-                Dictionary<ulong, string> allowedRoleIds = _discordConfig.GetValueOrDefault(nameof(DiscordConfig.CkVanityRoles), new Dictionary<ulong, string>());
-                // display the list of allowed role ID's
-                _logger.LogDebug($"Allowed role ids: {string.Join(", ", allowedRoleIds)}");
+                Dictionary<ulong, string> sundouleiaRoles = _discordConfig.GetValueOrDefault(nameof(DiscordConfig.VanityRoles), new Dictionary<ulong, string>());
+                Dictionary<ulong, string> ckRoles = _discordConfig.GetValueOrDefault(nameof(DiscordConfig.CkVanityRoles), new Dictionary<ulong, string>());
+                var sundouleiaRoleToId = sundouleiaRoles.ToDictionary(kvp => kvp.Value, kvp => kvp.Key, StringComparer.Ordinal);
 
-                // if there are not any allowed roles for vanity perks, output it.
-                if (!allowedRoleIds.Any())
-                    _logger.LogInformation("No roles were defined. Skipping cleanup.");
-                else
+                using var scope = _services.CreateAsyncScope();
+                using (var db = scope.ServiceProvider.GetRequiredService<SundouleiaDbContext>())
                 {
-                    // await the creation of a scope for this service
-                    using var scope = _services.CreateAsyncScope();
-                    // fetch the sundouleiaDatabaseContext from the database
-                    using (var db = scope.ServiceProvider.GetRequiredService<SundouleiaDbContext>())
+                    var vanityUsers = await db.AccountClaimAuth.Include(a => a.User).AsNoTracking()
+                        .Where(c => c.User != null && c.User.Tier != CkVanityTier.NoRole)
+                        .ToListAsync()
+                        .ConfigureAwait(false);
+
+                    // This should account for only the main accounts.
+                    foreach (var authClaim in vanityUsers)
                     {
-                        var vanityUsers = await db.AccountClaimAuth.Include(a => a.User).AsNoTracking()
-                            .Where(c => c.User != null && c.User.Tier != CkVanityTier.NoRole)
-                            .ToListAsync()
-                            .ConfigureAwait(false);
-
-                        // This should account for only the main accounts.
-                        foreach (var userClaim in vanityUsers)
+                        // grab the discord user from sundouleia.
+                        if (await sundouleiaGuild.GetUserAsync(authClaim.DiscordId).ConfigureAwait(false) is not { } sundouleiaUser)
                         {
-                            // get the respective discord user.
-                            var discordUser = await sundouleiaGuild.GetUserAsync(userClaim.DiscordId).ConfigureAwait(false);
-                            _logger.LogInformation($"Checking User: {userClaim.DiscordId}, {userClaim.User!.UID} ({userClaim.User.Alias}), User in Roles: {string.Join(", ", discordUser?.RoleIds ?? new List<ulong>())}");
+                            _logger.LogWarning($"Could not find discord user [{authClaim.DiscordId}] in Sundouleia guild.");
+                            await Task.Delay(250, token).ConfigureAwait(false);
+                            continue;
+                        }
 
-                            // if the discord user no longer exists, or no longer has any of the allowed role ID's for these benefits....
-                            if (discordUser is null || !discordUser.RoleIds.Any(allowedRoleIds.Keys.Contains))
+                        // If any of their roles have a matched value contained in the SundouleiaCkSupporters list, we should validate them.
+                        if (sundouleiaUser.RoleIds.Any(r => sundouleiaRoles.TryGetValue(r, out var label) && SundouleiaCkSupporters.Contains(label, StringComparer.Ordinal)))
+                        {
+                            // They have a ck supporter role in sundouleia, so we should validate their roles in ck.
+                            if (await ckGuid.GetUserAsync(authClaim.DiscordId).ConfigureAwait(false) is { } ckUser)
                             {
-                                _logger.LogInformation($"User {userClaim.User.UID} not in allowed roles, deleting alias");
-                                userClaim.User.Alias = string.Empty;
-                                userClaim.User.Tier = CkVanityTier.NoRole;
-                                db.Update(userClaim.User);
+                                // If none of the ckUser's roleIds are in the dictionary, then we should remove all perks in sundouleia.
+                                if (!ckUser.RoleIds.Any(ckRoles.Keys.Contains))
+                                {
+                                    _logger.LogInformation($"User {authClaim.User!.UID} no longer has CK supporter roles, removing perks.");
+                                    var rolesToRemove = sundouleiaUser.RoleIds.Where(sundouleiaRoles.Keys.Contains);
+                                    if (rolesToRemove.Any())
+                                        await sundouleiaUser.RemoveRolesAsync(rolesToRemove).ConfigureAwait(false);
+                                }
+                            }
+                        }
+                        // Handle normally.
+                        else
+                        {
+                            if (!sundouleiaUser.RoleIds.Any(sundouleiaRoles.Keys.Contains))
+                            {
+                                _logger.LogInformation($"User {authClaim.User!.UID} not in allowed roles, deleting alias");
+                                authClaim.User.Alias = string.Empty;
+                                authClaim.User.Tier = CkVanityTier.NoRole;
+                                db.Update(authClaim.User);
                                 // Clear out the vanity perks from their alts.
-                                var secondaryUsers = await db.Auth.Include(u => u.User).AsNoTracking().Where(u => u.PrimaryUserUID == userClaim.User.UID).ToListAsync().ConfigureAwait(false);
+                                var secondaryUsers = await db.Auth.Include(u => u.User).AsNoTracking().Where(u => u.PrimaryUserUID == authClaim.User.UID).ToListAsync().ConfigureAwait(false);
                                 foreach (var secondaryUser in secondaryUsers)
                                 {
                                     _logger.LogDebug($"Secondary User {secondaryUser!.User!.UID} not in allowed roles, deleting alias & resetting supporter tier");
                                     secondaryUser.User.Alias = string.Empty;
                                     secondaryUser.User.Tier = CkVanityTier.NoRole;
-                                    // update the secondary user in the database
                                     db.Update(secondaryUser.User);
                                 }
                             }
-                            // await for the database to save changes
-                            await db.SaveChangesAsync().ConfigureAwait(false);
-                            // await a second before checking the next user
-                            await Task.Delay(1000, token).ConfigureAwait(false);
                         }
+                        // await for the database to save changes
+                        await db.SaveChangesAsync().ConfigureAwait(false);
+                        // await a second before checking the next user
+                        await Task.Delay(1000, token).ConfigureAwait(false);
                     }
                 }
             }

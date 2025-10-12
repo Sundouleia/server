@@ -1,8 +1,11 @@
 using Discord;
 using Discord.Rest;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json.Linq;
+using SundouleiaAPI.Enums;
 using SundouleiaShared.Data;
 using SundouleiaShared.Services;
+using System;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
@@ -29,13 +32,14 @@ public class DiscordBotServices
 
     // the various vanity roles that the bot can assign to users.
     public Dictionary<RestRole, string> VanityRoles { get; set; } = new();
+    public Dictionary<RestRole, string> CkVanityRoles { get; set; } = new();
 
     public ILogger<DiscordBotServices> Logger { get; init; }
     private readonly IConfigurationService<DiscordConfig> _config;
     private readonly IServiceProvider _services;
 
     // Discord Server cached Guilds.
-    public RestGuild? KinkporiumGuildCached;
+    public RestGuild? CkGuildCached;
     public RestGuild? SundouleiaGuildCached; 
     public ConcurrentQueue<KeyValuePair<ulong, Func<DiscordBotServices, Task>>> VerificationQueue { get; } = new(); // the verification queue
     private CancellationTokenSource _verificationTaskCts = new();
@@ -108,13 +112,13 @@ public class DiscordBotServices
     public async Task ProcessReports(IUser discordUser, CancellationToken token)
     {
         // if the guild is null, log the warning that the guild is null and return
-        if (KinkporiumGuildCached is null)
+        if (CkGuildCached is null)
         {
             Logger.LogWarning("No Guild Cached");
             return;
         }
         // if user id is null, log the warning that the user id is null and return
-        Logger.LogInformation("Processing Reports Queue for Guild " + KinkporiumGuildCached.Name + 
+        Logger.LogInformation("Processing Reports Queue for Guild " + CkGuildCached.Name + 
             " from User: " + discordUser.GlobalName);
 
         // otherwise grab our channel report ID
@@ -125,7 +129,7 @@ public class DiscordBotServices
             return;
         }
 
-        var restChannel = await KinkporiumGuildCached.GetTextChannelAsync(reportChannelId.Value).ConfigureAwait(false);
+        var restChannel = await CkGuildCached.GetTextChannelAsync(reportChannelId.Value).ConfigureAwait(false);
         // Filter messages to only delete profile report messages sent by the bot
         var messages = await restChannel.GetMessagesAsync().FlattenAsync().ConfigureAwait(false);
         var profileReportMessages = messages.Where(m => m.Author.Id == discordUser.Id);
@@ -258,7 +262,7 @@ public class DiscordBotServices
     internal void UpdateCkGuild(RestGuild guild)
     {
         Logger.LogInformation("Ck Guild Updated to cache: "+ guild.Name);
-        KinkporiumGuildCached = guild;
+        CkGuildCached = guild;
     }
 
     internal void UpdateSundouleiaGuild(RestGuild guild)

@@ -27,7 +27,7 @@ public partial class SundouleiaHub
         var requestResult = await RequestFiles(dto.Mods.FilesToAdd).ConfigureAwait(false);
         
         // compose the new return dto based off the resulting request.
-        var newModUpdatesDto = new NewModUpdates(requestResult.DownloadFiles, dto.Mods.HashesToRemove);
+        var newModUpdatesDto = new NewModUpdates(requestResult.DownloadFiles, dto.Mods.HashesToRemove, requestResult.RequiresUpload.Count is not 0);
         await Clients.Users(recipientUids).Callback_IpcUpdateFull(new(new(UserUID), newModUpdatesDto, dto.Visuals)).ConfigureAwait(false);
         
         // Inc metrics and return the remaining files to be uploaded to the server.
@@ -46,7 +46,7 @@ public partial class SundouleiaHub
         var requestResult = await RequestFiles(dto.Mods.FilesToAdd).ConfigureAwait(false);
 
         // compose the new return dto based off the resulting request.
-        var newModUpdatesDto = new NewModUpdates(requestResult.DownloadFiles, dto.Mods.HashesToRemove);
+        var newModUpdatesDto = new NewModUpdates(requestResult.DownloadFiles, dto.Mods.HashesToRemove, requestResult.RequiresUpload.Count is not 0);
         await Clients.Users(recipientUids).Callback_IpcUpdateMods(new(new(UserUID), newModUpdatesDto)).ConfigureAwait(false);
 
         // Inc metrics and return the remaining files to be uploaded to the server.

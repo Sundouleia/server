@@ -1,13 +1,16 @@
 using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
+using Microsoft.EntityFrameworkCore;
+using StackExchange.Redis;
+using SundouleiaAPI.Enums;
 using SundouleiaShared.Data;
 using SundouleiaShared.Models;
 using SundouleiaShared.Services;
 using SundouleiaShared.Utils;
 using SundouleiaShared.Utils.Configuration;
-using Microsoft.EntityFrameworkCore;
-using StackExchange.Redis;
+using System.Security.Cryptography;
+using System.Text;
 using DiscordConfig = SundouleiaShared.Utils.Configuration.DiscordConfig;
 
 namespace SundouleiaDiscord.Modules.AccountWizard;
@@ -36,7 +39,6 @@ public partial class AccountWizard : InteractionModuleBase
         _dbContextFactory = dbContextFactory;
     }
 
-
     // The main menu display for the Sundouleia Account Management Wizard.
     // Initially called upon by the bot's pinned message, and the * is true, meaning it is to be initialized
     [ComponentInteraction("wizard-home:*")]
@@ -52,36 +54,46 @@ public partial class AccountWizard : InteractionModuleBase
         using SundouleiaDbContext sundouleiaDb = await GetDbContext().ConfigureAwait(false);
         // the user has an account of they have an accountClaimAuth in the database matching their discord ID.
         // Additionally, it checks to see if the time started at is null, meaning the claiming process has finished.
-        bool hasAccount = await sundouleiaDb.AccountClaimAuth.AnyAsync(u => u.DiscordId == Context.User.Id && u.StartedAt == null).ConfigureAwait(false);
+        var claimAuth = await sundouleiaDb.AccountClaimAuth.Include(a => a.User).AsNoTracking().SingleOrDefaultAsync(u => u.DiscordId == Context.User.Id).ConfigureAwait(false);
+        var hasAccount = claimAuth != null && claimAuth.StartedAt == null;
+        var isSupporter = claimAuth != null && claimAuth.User != null && claimAuth.User.Tier is not CkVanityTier.NoRole;
+
+        var titleText = hasAccount ? $"Welcome back, {(!string.IsNullOrEmpty(claimAuth.User.Alias) ? claimAuth.User.Alias : claimAuth.User.UID)}!" : "You have no Account linked!";
+        var descriptionText = new StringBuilder();
+        descriptionText.Append(hasAccount ? "How would you like to manage your Account?\n\n" : "You may recover an account or claim ownership of one below.\n\n");
+        if (!hasAccount)
+        {
+            descriptionText.AppendLine("- 🎉 Begins the process of claiming your Sundouleia Account!");
+            descriptionText.AppendLine("- 🔗 Relink your account to a new Discord user.");
+        }
+        else
+        {
+            descriptionText.AppendLine("- 📖 View your account profile data.");
+            descriptionText.AppendLine("- 🏷️ Create a new profile for your account.");
+            descriptionText.AppendLine("- 💄 Setup / Change your vanity perks");
+            // descriptionText.AppendLine("- 🏥 Recover To recover a profile secret key, press \"🏥 Recover\"");
+            descriptionText.AppendLine("- ⚠️ Select which of your profiles to remove from your account.");
+        }
+
 
         EmbedBuilder eb = new();
-        eb.WithTitle("Welcome to CK's Sundouleia Account Management. How may I help you today?");
-        eb.WithDescription("Here is what you can do:" + Environment.NewLine + Environment.NewLine
-            // if the user DOES NOT HAVE AN ACCOUNT, these options will display in place of empty strings.
-            + (hasAccount ? string.Empty : ("- To Claim ownership of your Generated Account Key, select \"🎉 Claim Account\"" + Environment.NewLine))
-            + (hasAccount ? string.Empty : ("- If you are using a new Discord Account, select \"🔗 Relink Account\"" + Environment.NewLine))
-            // if the user DOES HAVE AN ACCOUNT, these options will display in place of empty strings.
-            + (!hasAccount ? string.Empty : ("- To view your profiles in your Account, press \"📖 View Profiles\"" + Environment.NewLine))
-            + (!hasAccount ? string.Empty : ("- To add a new profile for an alt character, press \"🏷️ Add Profile\"" + Environment.NewLine))
-            + (!hasAccount ? string.Empty : ("- To view and set your vanity perks, press \"💄 Vanity Perks\"" + Environment.NewLine))
-            + (!hasAccount ? string.Empty : ("- To record a profile secret key, press \"🏥 Recover\"" + Environment.NewLine))
-            + (!hasAccount ? string.Empty : ("- Delete your primary or secondary accounts with \"⚠️ Remove\""))
-            );
-        eb.WithColor(Color.Magenta);
+        eb.WithTitle(titleText);
+        eb.WithDescription(descriptionText.ToString());
+        eb.WithColor(Color.Gold);
         // construct the buttons for the respectively displayed options.
         ComponentBuilder cb = new();
         // display if the user does not have a verified account yet
         if (!hasAccount)
         {
             cb.WithButton("Claim Account", "wizard-claim", ButtonStyle.Primary, new Emoji("🎉"));
-            //cb.WithButton("Relink Account", "wizard-relink", ButtonStyle.Secondary, new Emoji("🔗"));
+            cb.WithButton("Relink Account", "wizard-relink", ButtonStyle.Secondary, new Emoji("🔗"));
         }
         // display if the user has a verified account
         else
         {
             cb.WithButton("View Profiles", "wizard-profiles", ButtonStyle.Secondary, new Emoji("📖"));
             cb.WithButton("Add Profile", "wizard-alt-profile", ButtonStyle.Secondary, new Emoji("🏷️"));
-            cb.WithButton("Vanity Perks", "wizard-vanity", ButtonStyle.Secondary, new Emoji("💄"));
+            cb.WithButton("Vanity Perks", "wizard-vanity", ButtonStyle.Secondary, new Emoji("💄"), disabled: !isSupporter);
             cb.WithButton("Recover", "wizard-recover", ButtonStyle.Secondary, new Emoji("🏥"));
             cb.WithButton("Remove", "wizard-remove", ButtonStyle.Danger, new Emoji("⚠️"));
         }
@@ -94,7 +106,7 @@ public partial class AccountWizard : InteractionModuleBase
             if (isBanned)
             {
                 EmbedBuilder ebBanned = new();
-                ebBanned.WithTitle("The CK Team has Banned This Account.");
+                ebBanned.WithTitle("Sundouleia's Team has Banned This Account.");
                 ebBanned.WithDescription("If you wish to be unbanned, contact one of the assistants regarding the issue.");
                 ebBanned.WithColor(Color.Red);
 
@@ -104,7 +116,7 @@ public partial class AccountWizard : InteractionModuleBase
 
             await RespondAsync(embed: eb.Build(), components: cb.Build(), ephemeral: true).ConfigureAwait(false);
             IUserMessage resp = await GetOriginalResponseAsync().ConfigureAwait(false);
-            // store the content message of the original responce with the user's ID as the key in the concurrent dictionary of valid interactions.
+            // store the content message of the original response with the user's ID as the key in the concurrent dictionary of valid interactions.
             _botServices.ValidInteractions[Context.User.Id] = resp.Id;
             _logger.LogInformation("Init Msg: {id}", resp.Id);
         }
@@ -250,11 +262,16 @@ public partial class AccountWizard : InteractionModuleBase
     private async Task<string> GenerateAccountClaimAuth(ulong discordId, string initialGeneratedKey, SundouleiaDbContext dbContext)
     {
         string verificationCode = StringUtils.GenerateRandomString(32);
+
+        // Get the hashed key.
+        using var sha256 = SHA256.Create();
+        var hashedKey = BitConverter.ToString(sha256.ComputeHash(Encoding.UTF8.GetBytes(initialGeneratedKey))).Replace("-", "", StringComparison.Ordinal);
+
         // Create the AccountClaimAuth object
         AccountClaimAuth accountClaimAuthToAdd = new AccountClaimAuth()
         {
             DiscordId = discordId,
-            InitialGeneratedKey = initialGeneratedKey,
+            InitialGeneratedKey = hashedKey,
             VerificationCode = verificationCode,
             StartedAt = DateTime.UtcNow
         };

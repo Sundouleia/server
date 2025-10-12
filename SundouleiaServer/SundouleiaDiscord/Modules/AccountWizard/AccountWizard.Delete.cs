@@ -21,7 +21,7 @@ public partial class AccountWizard
             + "- 1️⃣ is your primary account/UID" + Environment.NewLine
             + "- 2️⃣ are all your secondary accounts/UIDs" + Environment.NewLine
             + "If you are using Vanity UIDs the original UID is displayed in the second line of the account selection.");
-        eb.WithColor(Color.Magenta);
+        eb.WithColor(Color.Gold);
 
         ComponentBuilder cb = new();
         await AddUserSelection(sundouleiaDb, cb, "wizard-remove-select").ConfigureAwait(false);

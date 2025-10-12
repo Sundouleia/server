@@ -81,7 +81,7 @@ internal partial class DiscordBot
                 profile.Description = string.Empty;
                 profile.FlaggedForReport = false;
                 await _sundouleiaHubContext.Clients.User(split[1]).SendAsync(nameof(ISundouleiaHub.Callback_ServerMessage),
-                    MessageSeverity.Warning, "The CK Team has reviewed your KinkPlate and decided that your Picture / Description " +
+                    MessageSeverity.Warning, "Sundouleia's Team has reviewed your profile and decided that your Picture / Description " +
                     "does not adhere to our guidelines. To help prevent these actions, we have cleared them and given you a warning. " +
                     "Warnings don't lead to a ban but tell us how many times this has happened. DM an assistant if you wish to know why.")
                     .ConfigureAwait(false);
@@ -95,7 +95,7 @@ internal partial class DiscordBot
                 profile.IsDisabled = true;
                 profile.FlaggedForReport = false;
                 await _sundouleiaHubContext.Clients.User(split[1]).SendAsync(nameof(ISundouleiaHub.Callback_ServerMessage),
-                    MessageSeverity.Warning, "Your KinkPlate profile contained content that either harasses or has negative connotation towards " +
+                    MessageSeverity.Warning, "Your profile contained content that either harasses or has negative connotation towards " +
                     "another user. As a result, your ability to customize your profile has been revoked. If we recieve further reports," +
                     "your user will get banned.").ConfigureAwait(false);
                 break;
@@ -119,7 +119,7 @@ internal partial class DiscordBot
                     DiscordId = reg.DiscordId.ToString()
                 });
                 await _sundouleiaHubContext.Clients.User(split[1]).SendAsync(nameof(ISundouleiaHub.Callback_HardReconnectMessage),
-                    MessageSeverity.Warning, "The CK Team has determined that your account must be banned from usage of Sundouleia Services. " +
+                    MessageSeverity.Warning, "Sundouleia's Team has determined that your account must be banned from usage of Sundouleia Services. " +
                     "as a result, you will no longer be able to use Sundouleia on the currently logged in character with this account.", 
                     ServerState.ForcedReconnect).ConfigureAwait(false);
                 break;
@@ -136,7 +136,7 @@ internal partial class DiscordBot
                     reputation.ProfileViewStrikes++;
                 }
                 await _sundouleiaHubContext.Clients.User(split[2]).SendAsync(nameof(ISundouleiaHub.Callback_ServerMessage),
-                    MessageSeverity.Warning, "The CK Team has determined your report to be a miss-use of our system, or made with malicious " +
+                    MessageSeverity.Warning, "Sundouleia's Team has determined your report to be a miss-use of our system, or made with malicious " +
                     "attempt to bait another User into getting banned. As a result, a warning has been appended to your profile.").ConfigureAwait(false);
                 break;
         }

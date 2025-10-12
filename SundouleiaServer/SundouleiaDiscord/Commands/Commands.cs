@@ -332,7 +332,7 @@ public class SundouleiaCommands : InteractionModuleBase
 
         EmbedBuilder eb = new();
         eb.WithTitle($"Updating {rolesUpdated} roles...");
-        eb.WithColor(Color.Magenta);
+        eb.WithColor(Color.Gold);
         // respond to the message with an embed letting us know that we are updating the roles
         await FollowupAsync(embed: eb.Build(), ephemeral: true).ConfigureAwait(false);
         IUserMessage resp = await GetOriginalResponseAsync().ConfigureAwait(false);

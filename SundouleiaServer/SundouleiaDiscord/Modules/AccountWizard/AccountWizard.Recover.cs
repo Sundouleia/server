@@ -22,7 +22,7 @@ public partial class AccountWizard
 
         using var sundouleiaDb = await GetDbContext().ConfigureAwait(false);
         EmbedBuilder eb = new();
-        eb.WithColor(Color.Magenta);
+        eb.WithColor(Color.Gold);
         eb.WithTitle("Recover");
         eb.WithDescription("In case you have lost your secret key you can recover it here." + Environment.NewLine + Environment.NewLine
             + "## ⚠️ **Once you recover your key, the previously used key will be invalidated. If you use Sundouleia on multiple devices you will have to update the key everywhere you use it.** ⚠️" + Environment.NewLine + Environment.NewLine

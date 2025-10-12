@@ -46,7 +46,7 @@ public partial class AccountWizard
             + "Additionally, you will be able to set a UID Alias." + Environment.NewLine
             + "UID Alias's are a customizable label for your profiles UID that others will be able to see!." + Environment.NewLine + Environment.NewLine
             + sb.ToString());
-        eb.WithColor(Color.Magenta);
+        eb.WithColor(Color.Gold);
         ComponentBuilder cb = new();
         AddHome(cb);
         if (userIsInVanityRole)

@@ -23,11 +23,9 @@ public partial class AccountWizard
         var secondaryUids = await sundouleiaDb.Auth.CountAsync(p => p.PrimaryUserUID == primaryUID).ConfigureAwait(false);
         int remainingProfilesAllowed = 10 - secondaryUids;
         EmbedBuilder eb = new();
-        eb.WithColor(Color.Magenta);
-        eb.WithTitle("Add New Profile");
-        eb.WithDescription("Acquire a profile for one of your Alt Characters. " + Environment.NewLine + Environment.NewLine
-            + "Alt Character Profiles have separate config files, pairs, and permissions. " + Environment.NewLine
-            + "You could have everything set up to be a Dom on one character, a Sub on another, and a Switch on another. It's possible." + Environment.NewLine + Environment.NewLine
+        eb.WithColor(Color.Gold);
+        eb.WithTitle("Add Account Profile");
+        eb.WithDescription("Profiles have separate group folders, pairs, and permissions.\n\n"
             + $"You may create {remainingProfilesAllowed} more Profiles. (Capped at 10)");
         ComponentBuilder cb = new();
         AddHome(cb);
@@ -47,7 +45,7 @@ public partial class AccountWizard
         EmbedBuilder eb = new();
         // log the title for the creation of a new alt character profile
         eb.WithTitle("Alt Character Profile Created!");
-        eb.WithColor(Color.Magenta);
+        eb.WithColor(Color.Gold);
         ComponentBuilder cb = new();
         AddHome(cb);
         // handle the creation of a new alt character profile

@@ -1,12 +1,14 @@
 using Discord;
 using Discord.Interactions;
+using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json.Linq;
+using SundouleiaAPI.Enums;
 using SundouleiaDiscord.Modules.Popups;
 using SundouleiaShared.Data;
-using SundouleiaShared.Models;
-using SundouleiaShared.Utils;
-using Microsoft.EntityFrameworkCore;
-using Prometheus;
-using System.Globalization;
+using System;
+using System.Security.Cryptography;
+using System.Text;
+using DiscordConfig = SundouleiaShared.Utils.Configuration.DiscordConfig;
 
 namespace SundouleiaDiscord.Modules.AccountWizard;
 
@@ -28,16 +30,16 @@ public partial class AccountWizard
 
         // create a new embed builder to update the current one with the new menu display.
         EmbedBuilder eb = new();
-        eb.WithColor(Color.Magenta);
-        eb.WithTitle("Start Claim Process");
-        eb.WithDescription("The shop Mistress has put in extra effort to make sure end users put in less work!\n"+
-            "In other words, you wont need to login and mess with your lodestone page for verification!" + Environment.NewLine + Environment.NewLine
-            + "**To claim your account, please make sure:**" + Environment.NewLine + Environment.NewLine
-            + " 🔘 You are logged into FFXIV and connected to the Sundouleia Server" + Environment.NewLine + Environment.NewLine
-            + " 🔘 You located your primary account's secret key (Under Account Management in the settings window of Sundouleia's UI)");
+        eb.WithColor(Color.Gold);
+        eb.WithTitle("Account Claim Process");
+        eb.WithDescription("Sundouleia's Claim Process ensures verification does not interface with lodestone or any SquareEnix interfaces.\n\n"
+            + "**Verification is instead handled via Dalamud's overlay UI**\n\n"
+            + "### Before you begin, make that:\n\n"
+            + " 🔘 You are logged into FFXIV and connected to Sundouleia.\n\n"
+            + " 🔘 You can copy your account's secret key. (In Sundouleias `Settings > Accounts` UI)");
         ComponentBuilder cb = new();
         AddHome(cb); // add the home button so we can go back at any point
-        cb.WithButton("Begin the Claim Process", "wizard-register-start", ButtonStyle.Primary, emote: new Emoji("💌")); // button to start claim process.
+        cb.WithButton("I'm Ready!", "wizard-register-start", ButtonStyle.Primary, emote: new Emoji("⏭️")); // button to start claim process.
         await ModifyInteraction(eb, cb).ConfigureAwait(false); // modify the message currently displaying the homepage details.
     }
 
@@ -80,7 +82,7 @@ public partial class AccountWizard
 
         // create the embed builder where we make the color purple, and then prompt the user with the registration modal.
         EmbedBuilder eb = new();
-        eb.WithColor(Color.Magenta);
+        eb.WithColor(Color.Gold);
         // provide the registration modal and await the response, returns if the registration was successful or not, and the verification code.
         bool success = HandleRegisterModalAsync(eb, initialKeyModal);
         // while we handle the registration for the modal, construct the component builder allowing the user to cancel, verify, or try again.
@@ -135,27 +137,26 @@ public partial class AccountWizard
 
         EmbedBuilder eb = new();
         ComponentBuilder cb = new();
-        eb.WithColor(Color.Magenta);
+        eb.WithColor(Color.Gold);
         // await the finish of the model
         (bool success, string uid, string key) = await HandleVerificationModalAsync(eb, verificationCodeModal).ConfigureAwait(false);
 
         if (success)
         {
             eb.WithColor(Color.Green);
-            eb.WithTitle($"Account Sucessfully Claimed. The UID : {uid} now belongs to you.");
-            eb.WithDescription("You claimed this account with its corrisponding secret key." + Environment.NewLine + Environment.NewLine
-                + $"**Save this secret key, as if you lose it, all sub-profiles will also be lost.**"
-                + Environment.NewLine + Environment.NewLine
-                + $"**Your UID is:** {uid}" + Environment.NewLine
-                + $"**Your Secret Key is:** {key}");
+            eb.WithTitle($"[{uid}] Is now your Primary Account Profile.");
+            eb.WithDescription($"**Save this key! If you lose it, all other profiles of this account will be lost.**\n\n"
+                + $"**Your UID is:** ```{uid}```\n"
+                + $"**Your Secret Key is:** ```{key}```");
             AddHome(cb);
         }
         else
         {
             eb.WithColor(Color.Gold);
             eb.WithTitle("Failed to Claim Account");
-            eb.WithDescription("CK Sundouleia Services was unable to claim your account as the verification time expired, "
-                + "or the code was incorrect." + Environment.NewLine + Environment.NewLine
+            eb.WithDescription("Unable to claim your account. One of the following occurred:\n"
+                + "- The verification time expired\n"
+                + "- The code was incorrect.\n\n"
                 + "Please restart your verification process.");
             cb.WithButton("Cancel", "wizard-claim", ButtonStyle.Secondary, emote: new Emoji("❌"));
         }
@@ -180,27 +181,32 @@ public partial class AccountWizard
             embed.WithTitle("Initial key was not provided in the modal. Try again.");
             return false;
         }
+
+        // Get the hashed key.
+        using var sha256 = SHA256.Create();
+        var hashedKey = BitConverter.ToString(sha256.ComputeHash(Encoding.UTF8.GetBytes(arg.InitialKeyStr))).Replace("-", "", StringComparison.Ordinal);
+
         // otherwise, if the initial key is not in our database, then someone is trying to forge it
-        else if (!db.Auth.Any(a => a.HashedKey == arg.InitialKeyStr))
+        if (!db.Auth.Any(a => a.HashedKey == hashedKey))
         {
             embed.WithTitle("This secret key is not being used by any users, or you pasted it in wrong.");
             return false;
         }
-        else if (db.AccountClaimAuth.Any(a => a.InitialGeneratedKey == arg.InitialKeyStr))
+        if (db.AccountClaimAuth.Any(a => a.InitialGeneratedKey == hashedKey))
         {
             embed.WithTitle("This secret key has already been claimed by another user.");
             return false;
         }
 
-        embed.WithTitle("Complete Account Claim Process");
-        embed.WithDescription("CK Sundouleia Services has generated a verification code for you. This will be sent to your currently logged in client."
-                              + Environment.NewLine + Environment.NewLine
-                              + $"**When you are ready for the verification code to be pushed to your game, press the button below.**"
-                              + Environment.NewLine + Environment.NewLine
-                              + "Verification will expire in 10minutes starting now.\nIf you fail to verify, you'll have to register again.");
+        embed.WithTitle("Claim Process - Verification");
+        embed.WithDescription("A verification code was generated and is ready sent to you.\n\n"
+            + "__This will be sent to your currently logged in client__\n\n"
+            + $"**Send the code to the client once you are logged in and connected.**\n\n"
+            + "Verification will expire in 10minutes starting now.\n"
+            + "If you fail to verify, you'll have to register again.");
 
         // store the initial key to the initial key mapping.
-        _botServices.DiscordInitialKeyMapping[Context.User.Id] = (arg.InitialKeyStr, string.Empty);
+        _botServices.DiscordInitialKeyMapping[Context.User.Id] = (hashedKey, string.Empty);
 
         // return success with the verification code.
         return true;
@@ -273,6 +279,66 @@ public partial class AccountWizard
         dbContext.Update(user);
         dbContext.Update(rep);
         await dbContext.SaveChangesAsync().ConfigureAwait(false);
+
+        // Do a personalized vanity role update check.
+        _logger.LogInformation("Grabbing supporter roles from both discords for personalized update..");
+        var sundouleiaRoles = _discordConfig.GetValueOrDefault(nameof(DiscordConfig.VanityRoles), new Dictionary<ulong, string>());
+        var ckRoles = _discordConfig.GetValueOrDefault(nameof(DiscordConfig.CkVanityRoles), new Dictionary<ulong, string>());
+        var sundouleiaRoleToId = sundouleiaRoles.ToDictionary(kvp => kvp.Value, kvp => kvp.Key, StringComparer.Ordinal);
+        // Grab the context discord user from sundouleia.
+        var sundouleiaUser = await _botServices.SundouleiaGuildCached.GetUserAsync(Context.User.Id).ConfigureAwait(false);
+        // If they do not contain any roles, check if they have any roles in ck first, and if they do, assign them.
+        if (!sundouleiaUser.RoleIds.Any(sundouleiaRoles.ContainsKey))
+        {
+            // Scope into ck and check their user there.
+            if (await _botServices.CkGuildCached.GetUserAsync(authClaim.DiscordId).ConfigureAwait(false) is { } ckUser)
+            {
+                // get their roleIds.
+                var roleIds = ckUser.RoleIds;
+                _logger.LogInformation($"User {authClaim.User!.UID} has CK Roles: {string.Join(", ", roleIds)}");
+                // Determine the highest role to check against by it's priority.
+                var highestRoleId = roleIds.Where(ckRoles.ContainsKey).OrderByDescending(id => DiscordBot.RoleToVanityTier[ckRoles[id]]).FirstOrDefault();
+                // Get the string name of this role.
+                if (ckRoles.TryGetValue(highestRoleId, out var priorityRole) && DiscordBot.CkToSundRoles.TryGetValue(priorityRole, out var matchingSundRoles))
+                {
+                    // Assign all matching sundouleiaRoles to the user.
+                    var rolesToAssign = matchingSundRoles.Select(r => sundouleiaRoleToId[r]).ToList();
+                    await sundouleiaUser.AddRolesAsync(rolesToAssign).ConfigureAwait(false);
+                    _logger.LogInformation($"Assigned Roles from Ck Supporter {authClaim.User!.UID} assigned roles: {string.Join(", ", matchingSundRoles)}");
+                }
+            }
+        }
+
+        // Now we should check their roles in sundouleia, and assign the highest role they have.
+        if (sundouleiaUser.RoleIds.Any(ckRoles.ContainsKey))
+        {
+            // fetch the roles they have, and output them.
+            _logger.LogInformation($"User {authClaim!.User!.UID} has roles: {string.Join(", ", sundouleiaUser.RoleIds)}");
+            // Determine the highest priority role
+            CkVanityTier highestRole = sundouleiaUser.RoleIds
+                .Where(sundouleiaRoles.ContainsKey)
+                .Select(id => DiscordBot.RoleToVanityTier[sundouleiaRoles[id]])
+                .OrderByDescending(tier => tier)
+                .FirstOrDefault();
+
+            // Assign Highest role found.
+            authClaim.User.Tier = highestRole;
+            dbContext.Update(authClaim.User);
+            _logger.LogInformation($"User {authClaim.User.UID} assigned to tier {highestRole} (highest role)");
+
+            // Update this on all secondary accounts of this user.
+            var altProfiles = await dbContext.Auth.Include(a => a.User).AsNoTracking().Where(a => a.PrimaryUserUID == authClaim.User.UID).ToListAsync().ConfigureAwait(false);
+            foreach (var profile in altProfiles)
+            {
+                _logger.LogDebug($"AltProfile [{profile.User.UID}] also given this perk!");
+                profile.User.Tier = highestRole;
+                dbContext.Update(profile.User);
+            }
+        }
+        // await for the database to save changes
+        await dbContext.SaveChangesAsync().ConfigureAwait(false);
+
+
         // return success with the user's UID
         return (true, user.UID, initialKey);
     }

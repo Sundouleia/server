@@ -19,7 +19,7 @@ public partial class AccountWizard
         using var sundouleiaDb = await GetDbContext().ConfigureAwait(false);
         EmbedBuilder eb = new();
         eb.WithTitle("Your Account Profiles");
-        eb.WithColor(Color.Magenta);
+        eb.WithColor(Color.Gold);
         eb.WithDescription("Your Account has 1 Primary Profile." + Environment.NewLine
             + "You also have a Secondary Profile for each registered alt character." + Environment.NewLine
             + "🌟 Your Account's Primary Profile" + Environment.NewLine
@@ -43,7 +43,7 @@ public partial class AccountWizard
         string title = string.Equals(dbUser.UserUID, dbUser.PrimaryUserUID, StringComparison.Ordinal) ? "Primary Account Profile" : "Alt Character Profile";
         eb.WithTitle($"{title} - {uid}");
         await HandleProfiles(eb, sundouleiaDb, uid).ConfigureAwait(false);
-        eb.WithColor(Color.Magenta);
+        eb.WithColor(Color.Gold);
         ComponentBuilder cb = new();
         await AddUserSelection(sundouleiaDb, cb, "wizard-profiles-select").ConfigureAwait(false);
         AddHome(cb);
