@@ -21,16 +21,23 @@ using Grpc.Core.Interceptors;
 
 namespace SundouleiaFileHost;
 
-class AuthInterceptor : Interceptor
+class AuthInterceptor(string psk) : Interceptor
 {
-	private readonly string _psk;
-
-	public AuthInterceptor(string psk)
-	{
-		_psk = psk;
-	}
+	private readonly string _psk = psk;
 
 	public override AsyncUnaryCall<TResponse> AsyncUnaryCall<TRequest, TResponse>(TRequest request, ClientInterceptorContext<TRequest, TResponse> context, AsyncUnaryCallContinuation<TRequest, TResponse> continuation)
+	{
+		return continuation(request, CreateAuthorizedContext(context));
+	}
+
+	public override TResponse BlockingUnaryCall<TRequest, TResponse>(TRequest request, ClientInterceptorContext<TRequest, TResponse> context, BlockingUnaryCallContinuation<TRequest, TResponse> continuation)
+	{
+		return continuation(request, CreateAuthorizedContext(context));
+	}
+
+	private ClientInterceptorContext<TRequest, TResponse> CreateAuthorizedContext<TRequest, TResponse>(ClientInterceptorContext<TRequest, TResponse> context)
+		where TRequest : class
+		where TResponse : class
 	{
 		var headers = new Metadata
 		{
@@ -38,6 +45,6 @@ class AuthInterceptor : Interceptor
 		};
 		var newOptions = context.Options.WithHeaders(headers);
 		var newContext = new ClientInterceptorContext<TRequest, TResponse>(context.Method, context.Host, newOptions);
-		return base.AsyncUnaryCall(request, newContext, continuation);
+		return newContext;
 	}
 }
