@@ -26,13 +26,20 @@ public partial class SundouleiaHub
         // could remove any invalid extensions from the initial list before passing in the request to filter out invalid filetypes.
         // This is already handled within the client but should be handled on the server as well for proper validity.
 
-        // Retrieve the upload URLs and download URLs for the new mods via their hashes.
-        var urlInfo = await _fileHost.GetUploadUrlsAsync(newMods.Select(m => m.Hash)).ConfigureAwait(false);
-
         // These contain the authorized upload links to send back to the client caller.
         var requiresUpload = new List<VerifiedModFile>();
         // These are able to be called back to the recipient UID's.
         var validMods = new List<VerifiedModFile>();
+
+        // Remove swapped files that do not contain files to transfer and add them to the valid mods list to be sent directly to the user
+        foreach (var mod in newMods.Where(m => !string.IsNullOrEmpty(m.SwappedPath)).ToList())
+        {
+            newMods.Remove(mod);
+            validMods.Add(new(mod.Hash, string.Empty, mod.GamePaths, mod.SwappedPath));
+        }
+
+        // Retrieve the upload URLs and download URLs for the new mods via their hashes.
+        var urlInfo = await _fileHost.GetUploadUrlsAsync(newMods.Select(m => m.Hash)).ConfigureAwait(false);
 
         // Iterate through all of the new mods and filter them accordingly based on their resulting dictionary outcomes.
         foreach (var modToAdd in newMods)
