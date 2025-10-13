@@ -41,8 +41,8 @@ public class FileHostService : IFileHost, IDisposable
 		AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
 #endif
 		_channel = GrpcChannel.ForAddress(baseAddress);
-		_channel.Intercept(new AuthInterceptor(psk));
-		_client = new FileHostAPI.FileHostAPIClient(_channel);
+		var invoker = _channel.Intercept(new AuthInterceptor(psk));
+		_client = new FileHostAPI.FileHostAPIClient(invoker);
 	}
 
 	// <summary>
