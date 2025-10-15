@@ -49,7 +49,7 @@ public partial class SundouleiaHub
 
         // Inform the other users in the area that you joined.
         var radarUids = onlineUsersInArea.Select(u => u.User.UID);
-        await Clients.Users(onlineUsersInArea.Select(u => u.User.UID)).Callback_RadarAddUpdateUser(new(info.User.ToUserData(), info.HashedCID)).ConfigureAwait(false);
+        await Clients.Users(radarUids).Callback_RadarAddUpdateUser(new(info.User.ToUserData(), info.HashedCID)).ConfigureAwait(false);
 
         // if we wanted to join the chat room, do so. (They must also have appropriate reputation.
         if (dto.JoinChat && auth.AccountRep.ChatUsage)
@@ -57,7 +57,7 @@ public partial class SundouleiaHub
             // If the count exceeds the cap, do not join the group.
             var count = _radarService.GetActiveGroupUsers(dto.WorldId, dto.TerritoryId);
             if (count >= RadarService.RadarChatCap)
-                await Clients.Caller.Callback_ServerMessage(MessageSeverity.Error, "The chat for this radar zone is capped. Cannot join!").ConfigureAwait(false);
+                await Clients.Caller.Callback_ServerMessage(MessageSeverity.Warning, "The chat for this radar zone is capped. Cannot join!").ConfigureAwait(false);
             else
                 await _radarService.JoinRadarChat(dto.WorldId, dto.TerritoryId, Context.ConnectionId).ConfigureAwait(false);
         }
@@ -152,7 +152,7 @@ public partial class SundouleiaHub
         else if (!inChatRoom && stateUpdate.UseChat && auth.AccountRep.ChatUsage)
         {
             if (_radarService.GetActiveGroupUsers(info.WorldId, info.TerritoryId) >= RadarService.RadarChatCap)
-                await Clients.Caller.Callback_ServerMessage(MessageSeverity.Error, "The chat for this radar zone is capped. Cannot join!").ConfigureAwait(false);
+                await Clients.Caller.Callback_ServerMessage(MessageSeverity.Warning, "The chat for this radar zone is capped. Cannot join!").ConfigureAwait(false);
             else
                 await _radarService.JoinRadarChat(info.WorldId, info.TerritoryId, Context.ConnectionId).ConfigureAwait(false);
         }

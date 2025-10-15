@@ -1,13 +1,15 @@
 using Discord;
 using Discord.Interactions;
+using Microsoft.EntityFrameworkCore;
+using Prometheus;
+using StackExchange.Redis;
 using SundouleiaAPI.Enums;
 using SundouleiaShared.Data;
+using SundouleiaShared.Metrics;
 using SundouleiaShared.Models;
 using SundouleiaShared.Services;
 using SundouleiaShared.Utils;
 using SundouleiaShared.Utils.Configuration;
-using Microsoft.EntityFrameworkCore;
-using StackExchange.Redis;
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -19,24 +21,25 @@ namespace SundouleiaDiscord.Commands;
 #pragma warning disable CS8602
 public class SundouleiaCommands : InteractionModuleBase
 {
+    private readonly SundouleiaMetrics _metrics;
     private readonly DiscordBotServices _botServices;
-    private readonly ServerTokenGenerator _serverTokenGenerator;                // the server token generator
-    private readonly ILogger<SundouleiaCommands> _logger;                       // the logger for the SundouleiaCommands
-    private readonly IServiceProvider _services;                                // our service provider
-    private readonly IConfigurationService<DiscordConfig> _discordConfigService;// the discord configuration service
-    private readonly IConnectionMultiplexer _connectionMultiplexer;             // the connection multiplexer for the discord bot
+    private readonly ServerTokenGenerator _tokenGen;                        // the server token generator
+    private readonly ILogger<SundouleiaCommands> _logger;                   // the logger for the SundouleiaCommands
+    private readonly IServiceProvider _services;                            // our service provider
+    private readonly IConfigurationService<DiscordConfig> _discordConfig;   // the discord configuration service
+    private readonly IConnectionMultiplexer _multiplexer;                   // the connection multiplexer for the discord bot
 
-    public SundouleiaCommands(DiscordBotServices botServices, ServerTokenGenerator tokenGenerator, 
-        ILogger<SundouleiaCommands> logger, IServiceProvider services,
-        IConfigurationService<DiscordConfig> sundouleiaDiscordConfig,
-        IConnectionMultiplexer connectionMultiplexer)
+    public SundouleiaCommands(DiscordBotServices botServices, ServerTokenGenerator tokenGen,
+        SundouleiaMetrics metrics, ILogger<SundouleiaCommands> logger, IServiceProvider services,
+        IConfigurationService<DiscordConfig> discordConfig, IConnectionMultiplexer multiplexer)
     {
+        _metrics = metrics;
         _botServices = botServices;
-        _serverTokenGenerator = tokenGenerator;
+        _tokenGen = tokenGen;
         _logger = logger;
         _services = services;
-        _discordConfigService = sundouleiaDiscordConfig;
-        _connectionMultiplexer = connectionMultiplexer;
+        _discordConfig = discordConfig;
+        _multiplexer = multiplexer;
     }
 
     // the menu displayed when the user types /userinfo, should be only allows for admins
@@ -139,16 +142,16 @@ public class SundouleiaCommands : InteractionModuleBase
         {
             // An HttpClient is created to send a POST request to a specific URI
             using HttpClient client = new HttpClient();
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _serverTokenGenerator.Token);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _tokenGen.Token);
 
             ClientMessage payload = new ClientMessage(messageType, message, uid ?? string.Empty);
             string jsonPayload = JsonSerializer.Serialize(payload);
-            _logger.LogInformation("Sending message to {uri} with payload: {jsonPayload}", new Uri(_discordConfigService.GetValue<Uri>(nameof(DiscordConfig.MainServerAddress)), "/msgc/sendMessage"), jsonPayload);
+            _logger.LogInformation("Sending message to {uri} with payload: {jsonPayload}", new Uri(_discordConfig.GetValue<Uri>(nameof(DiscordConfig.MainServerAddress)), "/msgc/sendMessage"), jsonPayload);
 
-            using HttpResponseMessage response = await client.PostAsJsonAsync(new Uri(_discordConfigService.GetValue<Uri>(nameof(DiscordConfig.MainServerAddress)), "/msgc/sendMessage"), payload).ConfigureAwait(false);
+            using HttpResponseMessage response = await client.PostAsJsonAsync(new Uri(_discordConfig.GetValue<Uri>(nameof(DiscordConfig.MainServerAddress)), "/msgc/sendMessage"), payload).ConfigureAwait(false);
             if (response.IsSuccessStatusCode)
             {
-                ulong? discordChannelForMessages = _discordConfigService.GetValueOrDefault<ulong?>(nameof(DiscordConfig.ChannelForMessages), null);
+                ulong? discordChannelForMessages = _discordConfig.GetValueOrDefault<ulong?>(nameof(DiscordConfig.ChannelForMessages), null);
                 if (uid is null && discordChannelForMessages != null)
                 {
                     IMessageChannel? discordChannel = await Context.Guild.GetChannelAsync(884567637529604117) as IMessageChannel;
@@ -227,6 +230,92 @@ public class SundouleiaCommands : InteractionModuleBase
         await FollowupAsync($"Purge completed for users inactive for {timeFrame}.");
     }
 
+    [SlashCommand("createuser", "ADMIN ONLY: Creates a user with a UID ending in the specified 4 characters.")]
+    [RequireUserPermission(GuildPermission.Administrator)]
+    public async Task CreateUserWithCustomUidSuffix(
+    [Summary("uid_suffix", "Last 4 characters of the UID (must be 4 chars)")] string uidSuffix)
+    {
+        if (uidSuffix.Length != 4)
+        {
+            await RespondAsync("UID suffix must be exactly 4 characters.", ephemeral: true);
+            return;
+        }
+
+        try
+        {
+            // Immediately respond with a deferred message
+            await Context.Interaction.DeferAsync();
+            // Build the embed display for the response.
+            EmbedBuilder eb = new();
+            eb.WithTitle($"Generating UserUID ending in {uidSuffix}...");
+            eb.WithColor(Color.Gold);
+            await FollowupAsync(embed: eb.Build(), ephemeral: true).ConfigureAwait(false);
+            IUserMessage resp = await GetOriginalResponseAsync().ConfigureAwait(false);
+
+            // Begin creating the user.
+            using IServiceScope scope = _services.CreateScope();
+            using SundouleiaDbContext? db = scope.ServiceProvider.GetService<SundouleiaDbContext>();
+
+            // Generate UID with specified suffix, ensure uniqueness.
+            var user = new User() { LastLogin = DateTime.UtcNow };
+
+            bool hasValidUid = false;
+            while (!hasValidUid) // while its false, keep generating a new one.
+            {
+                var prefix = StringUtils.GenerateRandomString(6);
+                var candidate = prefix + uidSuffix;
+                if (db.Users.Any(u => u.UID == candidate || u.Alias == candidate))
+                    continue;
+                // Match was found, assign and break.
+                user.UID = candidate;
+                hasValidUid = true;
+            }
+
+            // Modify the message to indicate user creation.
+            eb.WithTitle($"UserUID Assigned {user.UID}");
+            eb.WithDescription($"Generating Auth & AccountRep entries.");
+            await ModifyMessageAsync(eb, resp).ConfigureAwait(false);
+
+            // Make an AccountRep entry for this user.
+            var reputation = new AccountReputation()
+            {
+                UserUID = user.UID,
+                User = user,
+            };
+
+            // Gen secret key 64long plus the current time.
+            string computedHash = StringUtils.Sha256String(StringUtils.GenerateRandomString(64) + DateTime.UtcNow.ToString());
+
+            // Add the auth for this user. In this case, the auth created is always the account's auth.
+            // Add the respective Auth, referencing the User.
+            var auth = new Auth()
+            {
+                HashedKey = StringUtils.Sha256String(computedHash),
+                UserUID = user.UID,
+                User = user,
+                PrimaryUserUID = user.UID,
+                PrimaryUser = user,
+                AccountRep = reputation
+            };
+
+            // Initialize all attached data to the User entry across the database.
+            await SharedDbFunctions.CreateMainProfile(user, reputation, auth, _logger, db,  _metrics).ConfigureAwait(false);
+            await db.SaveChangesAsync().ConfigureAwait(false);
+
+            eb.WithTitle($"User {user.UID} Created!");
+            eb.WithDescription($"Main Account is now valid in the database.\n\n"
+                + $"Account UserUID is: ```{user.UID}```\n\n"
+                + $"Account Secret Key is: ```{computedHash}```");
+            eb.WithColor(Color.Green);
+            await ModifyMessageAsync(eb, resp).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create user with custom UID suffix");
+            await RespondAsync("Failed to create user: " + ex.ToString(), ephemeral: true);
+        }
+    }
+    
     [SlashCommand("forcereconnect", "ADMIN ONLY: forcibly reconnects all online connected clients")]
     public async Task ForceReconnectOnlineUsers([Summary("message", "Message to send with reconnection notification")] string message,
     [Summary("severity", "Severity of the message")] MessageSeverity messageType = MessageSeverity.Information,
@@ -250,17 +339,17 @@ public class SundouleiaCommands : InteractionModuleBase
         try
         {
             using HttpClient client = new HttpClient();
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _serverTokenGenerator.Token);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _tokenGen.Token);
 
             HardReconnectMessage payload = new HardReconnectMessage(messageType, message, ServerState.ForcedReconnect, uid);
             string jsonPayload = JsonSerializer.Serialize(payload);
             _logger.LogInformation("Sending message to {uri} with payload: {jsonPayload}", 
-                new Uri(_discordConfigService.GetValue<Uri>(nameof(DiscordConfig.MainServerAddress)), "/msgc/forceHardReconnect"), jsonPayload);
+                new Uri(_discordConfig.GetValue<Uri>(nameof(DiscordConfig.MainServerAddress)), "/msgc/forceHardReconnect"), jsonPayload);
 
-            using HttpResponseMessage response = await client.PostAsJsonAsync(new Uri(_discordConfigService.GetValue<Uri>(nameof(DiscordConfig.MainServerAddress)), "/msgc/forceHardReconnect"), payload).ConfigureAwait(false);
+            using HttpResponseMessage response = await client.PostAsJsonAsync(new Uri(_discordConfig.GetValue<Uri>(nameof(DiscordConfig.MainServerAddress)), "/msgc/forceHardReconnect"), payload).ConfigureAwait(false);
             if (response.IsSuccessStatusCode)
             {
-                ulong? discordChannelForMessages = _discordConfigService.GetValueOrDefault<ulong?>(nameof(DiscordConfig.ChannelForMessages), null);
+                ulong? discordChannelForMessages = _discordConfig.GetValueOrDefault<ulong?>(nameof(DiscordConfig.ChannelForMessages), null);
                 if (discordChannelForMessages != null)
                 {
                     IMessageChannel? discordChannel = await Context.Guild.GetChannelAsync(884567637529604117) as IMessageChannel;
@@ -527,7 +616,7 @@ public class SundouleiaCommands : InteractionModuleBase
         Auth? auth = await db.Auth.Include(u => u.PrimaryUser).SingleOrDefaultAsync(u => u.UserUID == dbUser.UID).ConfigureAwait(false);
 
         // Fetch the identity from the database.
-        RedisValue identity = await _connectionMultiplexer.GetDatabase().StringGetAsync("SundouleiaHub:UID:" + dbUser.UID).ConfigureAwait(false);
+        RedisValue identity = await _multiplexer.GetDatabase().StringGetAsync("SundouleiaHub:UID:" + dbUser.UID).ConfigureAwait(false);
 
         // Set the title and description of the embed builder.
         eb.WithTitle("User Information");
