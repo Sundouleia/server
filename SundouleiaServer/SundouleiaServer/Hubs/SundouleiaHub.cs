@@ -269,7 +269,7 @@ public partial class SundouleiaHub : Hub<ISundouleiaHub>, ISundouleiaHub
 
                 // Remove from the redis database and send offline to all of their pairs.
                 await RemoveUserFromRedis().ConfigureAwait(false);
-                await SendOfflineToAllPairedUsers().ConfigureAwait(false);
+                await SendOfflineToAllPairedUsers(true).ConfigureAwait(false);
             }
             catch { /* Consume */ }
             finally
