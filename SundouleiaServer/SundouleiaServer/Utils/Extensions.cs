@@ -56,11 +56,11 @@ public static class Extensions
     public static UserData ToUserData(this User user)
         => new UserData(user.UID, user.Alias, user.Tier, user.CreatedAt);
 
-    public static SundesmoRequest ToApi(this PairRequest request)
-        => new SundesmoRequest(new(request.UserUID), new(request.OtherUserUID), request.IsTemporary, request.AttachedMessage, request.CreationTime);
+    public static SundesmoRequest ToApi(this PairRequest r)
+        => new SundesmoRequest(new(r.UserUID), new(r.OtherUserUID), new(r.IsTemporary, r.AttachedMessage, r.FromWorldId, r.FromZoneId), r.CreationTime);
 
     public static SundesmoRequest ToApiRemoval(UserData user, UserData target) =>
-        new(user, target, false, string.Empty, DateTime.MinValue);
+        new(user, target, new(false, string.Empty, 0, 0), DateTime.MinValue);
 
     public static GlobalPerms ToApi(this GlobalPermissions? dbState)
         => dbState is null ? new() : new GlobalPerms()

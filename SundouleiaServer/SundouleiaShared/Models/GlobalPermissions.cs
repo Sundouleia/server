@@ -18,9 +18,9 @@ public class GlobalPermissions
     // can probably figure this out as time goes on, but useful to have for the future.
 
     // What is set initially upon adding someone.
-    public bool DefaultAllowAnimations  { get; set; } = false;
-    public bool DefaultAllowSounds      { get; set; } = false;
-    public bool DefaultAllowVfx         { get; set; } = false;
+    public bool DefaultAllowAnimations  { get; set; } = true;
+    public bool DefaultAllowSounds      { get; set; } = true;
+    public bool DefaultAllowVfx         { get; set; } = true;
 
     // Other stuff that can be added later on..
 }

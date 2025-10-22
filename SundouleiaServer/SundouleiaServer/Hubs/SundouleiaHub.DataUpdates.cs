@@ -47,7 +47,7 @@ public partial class SundouleiaHub
 
         // compose the new return dto based off the resulting request.
         var newModUpdatesDto = new NewModUpdates(requestResult.DownloadFiles, dto.Mods.HashesToRemove, requestResult.RequiresUpload.Count);
-        await Clients.Users(recipientUids).Callback_IpcUpdateMods(new(new(UserUID), newModUpdatesDto)).ConfigureAwait(false);
+        await Clients.Users(recipientUids).Callback_IpcUpdateMods(new(new(UserUID), newModUpdatesDto, dto.ManipString)).ConfigureAwait(false);
 
         // Inc metrics and return the remaining files to be uploaded to the server.
         _metrics.IncCounter(MetricsAPI.CounterDataUpdateMods);

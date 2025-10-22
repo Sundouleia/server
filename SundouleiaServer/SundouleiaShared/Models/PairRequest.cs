@@ -29,4 +29,8 @@ public class PairRequest
 
     // Optionally attached message.
     public string AttachedMessage { get; set; } = string.Empty;
+
+    // Sent from WorldId and ZoneId.
+    public ushort FromWorldId { get; set; } = 0;
+    public ushort FromZoneId { get; set; } = 0;
 }

@@ -78,8 +78,6 @@ public partial class SundouleiaHub
         if (await DbContext.UserRadarInfo.SingleOrDefaultAsync(ur => ur.UserUID == UserUID).ConfigureAwait(false) is not { } info)
             return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NullData);
 
-        // Do not need to validate reputation here as we should be resetting all data for security reasons.
-
         // Remember the area we left.
         var leftWorld = info.WorldId;
         var leftTerritory = info.TerritoryId;
