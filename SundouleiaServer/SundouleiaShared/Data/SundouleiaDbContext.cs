@@ -75,7 +75,7 @@ public class SundouleiaDbContext : DbContext
         modelBuilder.Entity<ClientPair>().HasKey(u => new { u.UserUID, u.OtherUserUID });
         modelBuilder.Entity<ClientPair>().HasIndex(c => c.UserUID);
         modelBuilder.Entity<ClientPair>().HasIndex(c => c.OtherUserUID);
-        modelBuilder.Entity<ClientPair>().HasIndex(c => c.IsTemporary);
+        modelBuilder.Entity<ClientPair>().HasIndex(c => c.TempAccepterUID);
         modelBuilder.Entity<ClientPairPermissions>().ToTable("client_pair_permissions");
         modelBuilder.Entity<ClientPairPermissions>().HasKey(u => new { u.UserUID, u.OtherUserUID });
         modelBuilder.Entity<ClientPairPermissions>().HasIndex(c => c.UserUID);

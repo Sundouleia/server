@@ -26,14 +26,15 @@ public partial class SundouleiaHub
         // Convert the UserInfo objects returned into UserPair DTO's for transit.
         return pairs.Select(p =>
         {
-            var pairList = new UserPair(
+            var pairDto = new UserPair(
                 new UserData(p.Key, p.Value.Alias, p.Value.Tier, p.Value.Created),
                 p.Value.OwnPerms.ToApi(),
                 p.Value.OtherGlobals.ToApi(),
                 p.Value.OtherPerms.ToApi(),
-                p.Value.IsTemporary
+                p.Value.PairInitAt,
+                p.Value.PairTempAccepter
             );
-            return pairList;
+            return pairDto;
         }).ToList();
     }
 

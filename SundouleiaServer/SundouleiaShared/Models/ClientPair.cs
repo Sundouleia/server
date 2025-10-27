@@ -26,5 +26,5 @@ public class ClientPair
     public byte[] Timestamp { get; set; }
 
     public DateTime CreatedAt { get; set; }
-    public bool IsTemporary { get; set; } = false;
+    public string TempAccepterUID { get; set; } = string.Empty;
 }

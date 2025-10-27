@@ -178,9 +178,10 @@ public partial class SundouleiaHub
                           // and now we can make a new object with the results of this query.
                           select new //  [ Ultimately stored into clientPairs ]
                           {
-                              UserUID = cp.UserUID, // Select UserUID
-                              OtherUserUID = cp.OtherUserUID, // Select OtherUserUID
-                              IsTemporary = cp.IsTemporary,
+                              UserUID = cp.UserUID,             // Select UserUID
+                              OtherUserUID = cp.OtherUserUID,   // Select OtherUserUID
+                              InitializedAt = cp.CreatedAt,     // When the pairing was created
+                              TempAccepter = cp.TempAccepterUID,// If temporary, who accepted it.
                           };
 
         if (!clientPairs.Any())
@@ -218,11 +219,12 @@ public partial class SundouleiaHub
                                 OtherUserAlias = u.Alias,
                                 OtherUserTier = u.Tier,
                                 OtherUserCreatedDate = u.CreatedAt,
-                                IsTemporary = user.IsTemporary,
                                 OwnGlobalPerms = userGlobalPerm,
                                 OwnPermissions = ownperm,
                                 OtherGlobalPerms = otherUserGlobalPerm,
                                 OtherPermissions = otherperm,
+                                InitializedAt = user.InitializedAt,
+                                TempAccepter = user.TempAccepter,
                             };
 
         // Get final query result using no tracking.
@@ -235,11 +237,12 @@ public partial class SundouleiaHub
             resultList[0].OtherUserAlias,
             resultList[0].OtherUserTier,
             resultList[0].OtherUserCreatedDate,
-            resultList[0].IsTemporary,
             resultList[0].OwnGlobalPerms,
             resultList[0].OwnPermissions,
             resultList[0].OtherGlobalPerms,
-            resultList[0].OtherPermissions
+            resultList[0].OtherPermissions,
+            resultList[0].InitializedAt,
+            resultList[0].TempAccepter
         );
     }
 
@@ -269,7 +272,8 @@ public partial class SundouleiaHub
                             {
                                 UserUID = cp.UserUID,
                                 OtherUserUID = cp.OtherUserUID,
-                                IsTemporary = cp.IsTemporary,
+                                InitializedAt = cp.CreatedAt,     // When the pairing was created
+                                TempAccepter = cp.TempAccepterUID,// If temporary, who accepted it.
                             };
 
         // Obtain the permission info for these pairs.
@@ -313,7 +317,6 @@ public partial class SundouleiaHub
                             {
                                 UserUID = user.UserUID,
                                 OtherUserUID = user.OtherUserUID,
-                                IsTemporary = user.IsTemporary,
                                 OtherUserAlias = u.Alias,
                                 OtherUserVanity = u.Tier,
                                 OtherUserCreatedDate = u.CreatedAt,
@@ -321,6 +324,8 @@ public partial class SundouleiaHub
                                 OwnPermissions = ownperm,
                                 OtherGlobalPerms = otherUserGlobalPerm,
                                 OtherPermissions = otherperm,
+                                InitializedAt = user.InitializedAt,
+                                TempAccepter = user.TempAccepter,
                             };
 
         // obtain the query result and form it into an established list
@@ -336,11 +341,12 @@ public partial class SundouleiaHub
                 g.First().OtherUserAlias,
                 g.First().OtherUserVanity,
                 g.First().OtherUserCreatedDate,
-                g.First().IsTemporary,
                 g.First().OwnGlobalPerms,
                 g.First().OwnPermissions,
                 g.First().OtherGlobalPerms,
-                g.First().OtherPermissions
+                g.First().OtherPermissions,
+                g.First().InitializedAt,
+                g.First().TempAccepter
             );
             return userInfo;
         }, StringComparer.Ordinal);
@@ -404,8 +410,8 @@ public partial class SundouleiaHub
     }
 
 
-    public record UserInfo(string Alias, CkVanityTier Tier, DateTime Created, bool IsTemporary,
-        GlobalPermissions OwnGlobals, ClientPairPermissions OwnPerms, GlobalPermissions OtherGlobals, ClientPairPermissions OtherPerms);
+    public record UserInfo(string Alias, CkVanityTier Tier, DateTime Created, GlobalPermissions OwnGlobals, ClientPairPermissions OwnPerms, 
+        GlobalPermissions OtherGlobals, ClientPairPermissions OtherPerms, DateTime PairInitAt, string PairTempAccepter);
 }
 #pragma warning restore MA0016
 #nullable disable

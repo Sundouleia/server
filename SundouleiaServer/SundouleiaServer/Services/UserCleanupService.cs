@@ -49,7 +49,9 @@ public class UserCleanupService : BackgroundService
 
                 CleanUpTimedOutAccountAuthClaims(dbContext);
                 CleanupOutdatedPairRequests(dbContext);
-                CleanupTemporaryPairs(dbContext);
+
+                // Cleanup temp stuff.
+                await CleanupTemporaryPairs(dbContext).ConfigureAwait(false);
 
                 dbContext.SaveChanges();
             }
@@ -160,17 +162,29 @@ public class UserCleanupService : BackgroundService
         }
     }
 
-    private void CleanupTemporaryPairs(SundouleiaDbContext dbContext)
+    private async Task CleanupTemporaryPairs(SundouleiaDbContext dbContext)
     {
         try
         {
             _logger.LogInformation("Cleaning up temporary pairs");
-            var temporaryPairs = dbContext.ClientPairs.AsNoTracking().Where(p => p.IsTemporary).ToList();
-            // get the pairs that are expired.
-            var expiredPairs = temporaryPairs.Where(p => p.CreatedAt < DateTime.UtcNow - TimeSpan.FromHours(12));
-            // remove them.
-            _logger.LogInformation($"Removing [{expiredPairs.Count()}] expired temporary pairs");
-            dbContext.ClientPairs.RemoveRange(expiredPairs);
+            // Get all Sundesmos who are currently temporary.
+            var temps = dbContext.ClientPairs.AsNoTracking().Where(p => !string.IsNullOrEmpty(p.TempAccepterUID)).ToList();
+            
+            // Then filter them out to only be ones over 24h old.
+            var filteredTemps = temps.Where(p => p.CreatedAt >= DateTime.UtcNow - TimeSpan.FromHours(24));
+
+            // Now we need to remove the range ClientPair and ClientPairPermissions for both ends of these sundesmos.
+            var tempSundesmoPerms = await dbContext.ClientPairPerms.AsNoTracking()
+                .Where(p => filteredTemps.Any(s => 
+                    (s.UserUID == p.UserUID && s.OtherUserUID == p.OtherUserUID) || 
+                    (s.UserUID == p.OtherUserUID && s.OtherUserUID == p.UserUID)))
+                .ToListAsync().ConfigureAwait(false);
+
+            // Log the removals.
+            _logger.LogInformation($"Removing [{filteredTemps.Count()}] temporary sundesmos and [{tempSundesmoPerms.Count()}] associated permissions");
+            dbContext.ClientPairs.RemoveRange(filteredTemps);
+            dbContext.ClientPairPerms.RemoveRange(tempSundesmoPerms);
+            await dbContext.SaveChangesAsync().ConfigureAwait(false);
         }
         catch (Exception ex)
         {

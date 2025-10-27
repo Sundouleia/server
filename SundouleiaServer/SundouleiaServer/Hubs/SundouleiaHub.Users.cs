@@ -153,14 +153,14 @@ public partial class SundouleiaHub
             User = callerUser,
             OtherUser = target,
             CreatedAt = DateTime.UtcNow,
-            IsTemporary = wasTempRequest,
+            TempAccepterUID = wasTempRequest ? callerUser.UID : string.Empty,
         };
         var recipientToCaller = new ClientPair()
         {
             User = target,
             OtherUser = callerUser,
             CreatedAt = DateTime.UtcNow,
-            IsTemporary = wasTempRequest,
+            TempAccepterUID = wasTempRequest ? callerUser.UID : string.Empty,
         };
         // Add them to the DB.
         await DbContext.ClientPairs.AddAsync(callerToRecipient).ConfigureAwait(false);
@@ -208,7 +208,14 @@ public partial class SundouleiaHub
         
         // Compile together the UserPair we will return to the caller.
         // This is the UserPair of the Caller (Request Accepter) -> Target (Request Creator)
-        var callerRetDto = new UserPair(target.ToUserData(), newOwnPerms.ToApi(), existingData!.OtherGlobals.ToApi(), newOtherPerms.ToApi(), existingData.IsTemporary);
+        var callerRetDto = new UserPair(
+            target.ToUserData(), 
+            newOwnPerms.ToApi(), 
+            existingData!.OtherGlobals.ToApi(),
+            newOtherPerms.ToApi(),
+            existingData.PairInitAt,
+            existingData.PairTempAccepter
+        );
 
         // Get if the request creator is online of not.
         var requesterIdentity = await GetUserIdent(uid).ConfigureAwait(false);
@@ -216,7 +223,14 @@ public partial class SundouleiaHub
         // If the request creator is online, send them the remove request and add pair callbacks, and also return sendOnline to both.
         if (requesterIdentity is not null)
         {
-            var requesterRetDto = new UserPair(callerUser.ToUserData(), newOtherPerms.ToApi(), existingData!.OwnGlobals.ToApi(), newOwnPerms.ToApi(), existingData.IsTemporary);
+            var requesterRetDto = new UserPair(
+                callerUser.ToUserData(),
+                newOtherPerms.ToApi(),
+                existingData!.OwnGlobals.ToApi(),
+                newOwnPerms.ToApi(),
+                existingData.PairInitAt,
+                existingData.PairTempAccepter
+            );
             await Clients.User(uid).Callback_RemoveRequest(Extensions.ToApiRemoval(new(uid), new(UserUID))).ConfigureAwait(false);
             await Clients.User(uid).Callback_AddPair(requesterRetDto).ConfigureAwait(false);
             await Clients.User(uid).Callback_UserOnline(new(callerUser.ToUserData(), UserCharaIdent)).ConfigureAwait(false);
@@ -258,6 +272,40 @@ public partial class SundouleiaHub
 
         _metrics.IncCounter(MetricsAPI.CounterRequestsRejected);
         _metrics.DecGauge(MetricsAPI.GaugeRequestsPending);
+        return HubResponseBuilder.Yippee();
+    }
+
+    [Authorize(Policy = "Identified")]
+    public async Task<HubResponse> UserMakePermanent(UserDto dto)
+    {
+        _logger.LogCallInfo(SundouleiaHubLogger.Args(dto));
+
+        // If the pair does not yet exist, fail.
+        if (await DbContext.ClientPairs.AsNoTracking().SingleOrDefaultAsync(p => p.UserUID == UserUID && p.OtherUserUID == dto.User.UID).ConfigureAwait(false) is not { } pairEntry)
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NotPaired);
+        
+        // If the pair is not temporary, fail.
+        if (string.IsNullOrEmpty(pairEntry.TempAccepterUID))
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.AlreadyPermanent);
+
+        // If the caller is not the temporary accepter, fail.
+        if (!string.Equals(pairEntry.TempAccepterUID, UserUID, StringComparison.Ordinal))
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.InvalidRecipient);
+
+        // Make both sides permanent.
+        var otherEntry = await DbContext.ClientPairs.SingleAsync(p => p.UserUID == dto.User.UID && p.OtherUserUID == UserUID).ConfigureAwait(false);
+
+        pairEntry.TempAccepterUID = string.Empty;
+        otherEntry.TempAccepterUID = string.Empty;
+
+        // Update the DB.
+        await DbContext.SaveChangesAsync().ConfigureAwait(false);
+
+        // Notify the other user that they are now permanent if they are online.
+        if (await GetUserIdent(dto.User.UID).ConfigureAwait(false) is not null)
+            await Clients.User(dto.User.UID).Callback_UpdatePairToPermanent(new(new(UserUID))).ConfigureAwait(false);
+
+        // return success to the caller, informing them they can update this pair to permanent.
         return HubResponseBuilder.Yippee();
     }
 
