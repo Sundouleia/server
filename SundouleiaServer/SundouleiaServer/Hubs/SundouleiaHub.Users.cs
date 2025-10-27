@@ -276,7 +276,7 @@ public partial class SundouleiaHub
     }
 
     [Authorize(Policy = "Identified")]
-    public async Task<HubResponse> UserMakePermanent(UserDto dto)
+    public async Task<HubResponse> UserPersistPair(UserDto dto)
     {
         _logger.LogCallInfo(SundouleiaHubLogger.Args(dto));
 
@@ -299,11 +299,13 @@ public partial class SundouleiaHub
         otherEntry.TempAccepterUID = string.Empty;
 
         // Update the DB.
+        DbContext.ClientPairs.Update(pairEntry);
+        DbContext.ClientPairs.Update(otherEntry);
         await DbContext.SaveChangesAsync().ConfigureAwait(false);
 
         // Notify the other user that they are now permanent if they are online.
         if (await GetUserIdent(dto.User.UID).ConfigureAwait(false) is not null)
-            await Clients.User(dto.User.UID).Callback_UpdatePairToPermanent(new(new(UserUID))).ConfigureAwait(false);
+            await Clients.User(dto.User.UID).Callback_PersistPair(new(new(UserUID))).ConfigureAwait(false);
 
         // return success to the caller, informing them they can update this pair to permanent.
         return HubResponseBuilder.Yippee();
