@@ -105,20 +105,11 @@ public partial class SundouleiaHub
     ///     Sends Callback_UserOffline to all paired online users of the client caller.
     /// </summary>
     /// <returns> The list of UID's the callbacks were sent to. </returns>
-    private async Task<List<string>> SendOfflineToAllPairedUsers(bool leaveZone = false)
+    private async Task<List<string>> SendOfflineToAllPairedUsers()
     {
         var pairedUids = await GetPairedUnpausedUsers().ConfigureAwait(false);
-        if (leaveZone)
-        {
-            var self = await DbContext.UserRadarInfo.Include(u => u.User).AsNoTracking().SingleAsync(u => u.UserUID == UserUID).ConfigureAwait(false);
-            await Clients.Users(pairedUids).Callback_RadarRemoveUser(new(self.User.ToUserData())).ConfigureAwait(false);
-            await Clients.Users(pairedUids).Callback_UserOffline(new(self.User.ToUserData())).ConfigureAwait(false);
-        }
-        else
-        {
-            var self = await DbContext.Users.AsNoTracking().SingleAsync(u => u.UID == UserUID).ConfigureAwait(false);
-            await Clients.Users(pairedUids).Callback_UserOffline(new(self.ToUserData())).ConfigureAwait(false);
-        }
+        var self = await DbContext.Users.AsNoTracking().SingleAsync(u => u.UID == UserUID).ConfigureAwait(false);
+        await Clients.Users(pairedUids).Callback_UserOffline(new(self.ToUserData())).ConfigureAwait(false);
         return pairedUids;
     }
 

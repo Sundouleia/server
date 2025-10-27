@@ -72,8 +72,6 @@ public partial class SundouleiaHub
     [Authorize(Policy = "Identified")]
     public async Task<HubResponse> RadarZoneLeave()
     {
-        _logger.LogMessage($"UserLeaveZone:[{UserUID}]");
-
         // Fail if the zone data does not exist.
         if (await DbContext.UserRadarInfo.SingleOrDefaultAsync(ur => ur.UserUID == UserUID).ConfigureAwait(false) is not { } info)
             return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NullData);

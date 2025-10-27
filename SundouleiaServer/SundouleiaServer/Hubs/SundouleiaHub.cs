@@ -269,13 +269,13 @@ public partial class SundouleiaHub : Hub<ISundouleiaHub>, ISundouleiaHub
 
                 // Remove from the redis database and send offline to all of their pairs.
                 await RemoveUserFromRedis().ConfigureAwait(false);
-                await SendOfflineToAllPairedUsers(true).ConfigureAwait(false);
+                await RadarZoneLeave().ConfigureAwait(false);
+                await SendOfflineToAllPairedUsers().ConfigureAwait(false);
             }
             catch { /* Consume */ }
             finally
             {
                 // Remove from user connections and any radar chats.
-                await _radarService.LeaveRadarChat(Context.ConnectionId).ConfigureAwait(false);
                 _userConnections.Remove(UserUID, out string removedId);
                 await _radarService.LeaveRadarChat(removedId).ConfigureAwait(false);
             }
