@@ -57,10 +57,10 @@ public static class Extensions
         => new UserData(user.UID, user.Alias, user.Tier, user.CreatedAt);
 
     public static SundesmoRequest ToApi(this PairRequest r)
-        => new SundesmoRequest(new(r.UserUID), new(r.OtherUserUID), new(r.IsTemporary, r.AttachedMessage, r.FromWorldId, r.FromZoneId), r.CreationTime);
+        => new SundesmoRequest(new(r.UserUID), new(r.OtherUserUID), new(r.IsTemporary, string.Empty, r.AttachedMessage, r.FromWorldId, r.FromZoneId), r.CreationTime);
 
     public static SundesmoRequest ToApiRemoval(UserData user, UserData target) =>
-        new(user, target, new(false, string.Empty, 0, 0), DateTime.MinValue);
+        new(user, target, new(false, string.Empty, string.Empty, 0, 0), DateTime.MinValue);
 
     public static GlobalPerms ToApi(this GlobalPermissions? dbState)
         => dbState is null ? new() : new GlobalPerms()
@@ -68,6 +68,9 @@ public static class Extensions
             DefaultAllowAnimations = dbState.DefaultAllowAnimations,
             DefaultAllowSounds = dbState.DefaultAllowSounds,
             DefaultAllowVfx = dbState.DefaultAllowVfx,
+            DefaultMoodleAccess = dbState.DefaultMoodleAccess,
+            DefaultMaxMoodleTime = dbState.DefaultMaxMoodleTime,
+            DefaultShareOwnMoodles = dbState.ShareOwnMoodles
         };
 
     public static PairPerms ToApi(this ClientPairPermissions? dbState)
@@ -76,7 +79,10 @@ public static class Extensions
             PauseVisuals = dbState.PauseVisuals,
             AllowAnimations = dbState.AllowAnimations,
             AllowSounds = dbState.AllowSounds,
-            AllowVfx = dbState.AllowVfx
+            AllowVfx = dbState.AllowVfx,
+            MoodleAccess = dbState.MoodleAccess,
+            MaxMoodleTime = dbState.MaxMoodleTime,
+            ShareOwnMoodles = dbState.ShareOwnMoodles
         };
 
     public static UserReputation ToApi(this AccountReputation? dbState)

@@ -1,11 +1,8 @@
 using Discord;
 using Discord.Rest;
 using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json.Linq;
-using SundouleiaAPI.Enums;
 using SundouleiaShared.Data;
 using SundouleiaShared.Services;
-using System;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;

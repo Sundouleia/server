@@ -1,7 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SundouleiaShared.Data;
 using SundouleiaShared.Metrics;
-using SundouleiaShared.Models;
 using SundouleiaShared.Services;
 using SundouleiaShared.Utils.Configuration;
 using System.Collections.Concurrent;

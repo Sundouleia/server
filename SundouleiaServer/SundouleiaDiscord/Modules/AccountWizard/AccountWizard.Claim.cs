@@ -1,11 +1,9 @@
 using Discord;
 using Discord.Interactions;
 using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json.Linq;
 using SundouleiaAPI.Enums;
 using SundouleiaDiscord.Modules.Popups;
 using SundouleiaShared.Data;
-using System;
 using System.Security.Cryptography;
 using System.Text;
 using DiscordConfig = SundouleiaShared.Utils.Configuration.DiscordConfig;

@@ -4,7 +4,6 @@ using SundouleiaShared.Metrics;
 using SundouleiaShared.Services;
 using SundouleiaShared.Utils.Configuration;
 using Microsoft.EntityFrameworkCore;
-using Prometheus;
 
 namespace SundouleiaServer;
 

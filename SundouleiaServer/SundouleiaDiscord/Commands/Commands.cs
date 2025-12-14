@@ -9,7 +9,6 @@ using SundouleiaShared.Metrics;
 using SundouleiaShared.Models;
 using SundouleiaShared.Services;
 using SundouleiaShared.Utils;
-using SundouleiaShared.Utils.Configuration;
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -284,7 +283,9 @@ public class SundouleiaCommands : InteractionModuleBase
             };
 
             // Gen secret key 64long plus the current time.
+#pragma warning disable MA0011 // IFormatProvider is missing
             string computedHash = StringUtils.Sha256String(StringUtils.GenerateRandomString(64) + DateTime.UtcNow.ToString());
+#pragma warning restore MA0011 // IFormatProvider is missing
 
             // Add the auth for this user. In this case, the auth created is always the account's auth.
             // Add the respective Auth, referencing the User.

@@ -26,6 +26,16 @@ public partial class SundouleiaHub
     public Task Callback_Blocked(UserDto _) => throw new PlatformNotSupportedException(UnsupportedMessage);
     public Task Callback_Unblocked(UserDto _) => throw new PlatformNotSupportedException(UnsupportedMessage);
 
+    // --- Moodles Integration Callbacks ---
+    public Task Callback_PairMoodleDataUpdated(MoodlesDataUpdate _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_PairMoodleStatusesUpdate(MoodlesStatusesUpdate _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_PairMoodlePresetsUpdate(MoodlesPresetsUpdate _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_PairMoodleStatusModified(MoodlesStatusModified _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_PairMoodlePresetModified(MoodlesPresetModified _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_ApplyMoodleId(ApplyMoodleId _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_ApplyMoodleStatus(ApplyMoodleStatus _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_RemoveMoodleId(RemoveMoodleId _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+
     // --- Data Update Callbacks ---
     public Task Callback_IpcUpdateFull(IpcUpdateFull _) => throw new PlatformNotSupportedException(UnsupportedMessage);
     public Task Callback_IpcUpdateMods(IpcUpdateMods _) => throw new PlatformNotSupportedException(UnsupportedMessage);

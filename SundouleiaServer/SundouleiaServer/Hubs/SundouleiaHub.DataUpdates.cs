@@ -76,6 +76,48 @@ public partial class SundouleiaHub
         return HubResponseBuilder.Yippee();
     }
 
+    #region M O O D L E S
+    [Authorize(Policy = "Identified")]
+    public async Task<HubResponse> UserPushMoodlesData(PushMoodlesData dto)
+    {
+        var recipientUids = dto.Recipients.Select(r => r.UID);
+        await Clients.Users(recipientUids).Callback_PairMoodleDataUpdated(new(new(UserUID), dto.Data)).ConfigureAwait(false);
+        return HubResponseBuilder.Yippee(); // No metrics yet.
+    }
+
+    [Authorize(Policy = "Identified")]
+    public async Task<HubResponse> UserPushMoodlesStatuses(PushMoodlesStatuses dto)
+    {
+        var recipientUids = dto.Recipients.Select(r => r.UID);
+        await Clients.Users(recipientUids).Callback_PairMoodleStatusesUpdate(new(new(UserUID), dto.Statuses)).ConfigureAwait(false);
+        return HubResponseBuilder.Yippee();
+    }
+
+    [Authorize(Policy = "Identified")]
+    public async Task<HubResponse> UserPushMoodlesPresets(PushMoodlesPresets dto)
+    {
+        var recipientUids = dto.Recipients.Select(r => r.UID);
+        await Clients.Users(recipientUids).Callback_PairMoodlePresetsUpdate(new(new(UserUID), dto.Presets)).ConfigureAwait(false);
+        return HubResponseBuilder.Yippee();
+    }
+
+    [Authorize(Policy = "Identified")]
+    public async Task<HubResponse> UserPushStatusModified(PushStatusModified dto)
+    {
+        var recipientUids = dto.Recipients.Select(r => r.UID);
+        await Clients.Users(recipientUids).Callback_PairMoodleStatusModified(new(new(UserUID), dto.Status, dto.Deleted)).ConfigureAwait(false);
+        return HubResponseBuilder.Yippee();
+    }
+
+    [Authorize(Policy = "Identified")]
+    public async Task<HubResponse> UserPushPresetModified(PushPresetModified dto)
+    {
+        var recipientUids = dto.Recipients.Select(r => r.UID);
+        await Clients.Users(recipientUids).Callback_PairMoodlePresetModified(new(new(UserUID), dto.Preset, dto.Deleted)).ConfigureAwait(false);
+        return HubResponseBuilder.Yippee();
+    }
+    #endregion M O O D L E S
+
     [Authorize(Policy = "Identified")]
     public async Task<HubResponse> UserUpdateProfileContent(ProfileContent dto)
     {

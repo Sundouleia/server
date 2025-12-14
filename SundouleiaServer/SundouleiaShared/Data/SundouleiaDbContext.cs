@@ -56,6 +56,17 @@ public class SundouleiaDbContext : DbContext
     public DbSet<UserProfileData> UserProfileData { get; set; }
     public DbSet<UserRadarInfo> UserRadarInfo { get; set; }
 
+    // File Security (For those who want it)
+    public DbSet<SMABaseFileData> ProtectedSMAFiles { get; set; }
+
+    // We can add a table to track stale entries here if necessary, but for the moment there is not much reason to do this.
+    // A person cannot claim a data hash that was changed and no longer exists since it is still encrypted and they won't know the decryption key for it.
+    // Likewise, the only way they would have this data is if it was extracting and in use during the time that this access was changed.
+    // At this point, the issue would narrow down to the level of trust the owner had when sharing the file, and how much time they let it be shared for.
+    //
+    // Ultimately you can never fully prevent access from an unwanted source, but this barrier allows for a layer of safety people may want to use.
+    // At the end of the day, know whoever you share the base file with has full access to it.
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<AccountClaimAuth>().ToTable("account_claim_auth");
@@ -104,5 +115,11 @@ public class SundouleiaDbContext : DbContext
         modelBuilder.Entity<UserRadarInfo>().HasIndex(c => c.UserUID);
         modelBuilder.Entity<UserRadarInfo>().HasIndex(c => c.TerritoryId);
         modelBuilder.Entity<UserRadarInfo>().HasIndex(c => c.WorldId);
+
+        modelBuilder.Entity<SMABaseFileData>().ToTable("protected_sma_files");
+        modelBuilder.Entity<SMABaseFileData>().HasKey(u => new { u.OwnerUID, u.FileId });
+        modelBuilder.Entity<SMABaseFileData>().HasIndex(c => c.OwnerUID);
+        modelBuilder.Entity<SMABaseFileData>().HasIndex(c => c.FileId);
+        modelBuilder.Entity<SMABaseFileData>().HasIndex(c => c.DataHash);
     }
 }

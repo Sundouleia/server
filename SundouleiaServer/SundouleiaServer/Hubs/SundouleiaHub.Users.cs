@@ -39,7 +39,7 @@ public partial class SundouleiaHub
 
         // Ensure that the request does not already exist in the database.
         if (await DbContext.Requests.AnyAsync(p => (p.UserUID == UserUID && p.OtherUserUID == target.UID) || (p.UserUID == target.UID && p.OtherUserUID == UserUID)).ConfigureAwait(false))
-            return HubResponseBuilder.AwDangIt<SundesmoRequest>(SundouleiaApiEc.RequestExists);
+            return HubResponseBuilder.AwDangIt<SundesmoRequest>(SundouleiaApiEc.AlreadyExists);
 
         // Prevent sending a request if already paired.
         if (await DbContext.ClientPairs.AnyAsync(p => (p.UserUID == UserUID && p.OtherUserUID == target.UID) || (p.UserUID == target.UID && p.OtherUserUID == UserUID)).ConfigureAwait(false))
@@ -92,7 +92,7 @@ public partial class SundouleiaHub
 
         // Ensure that the request does not already exist in the database.
         if (await DbContext.Requests.SingleOrDefaultAsync(k => k.UserUID == UserUID && k.OtherUserUID == target.UID).ConfigureAwait(false) is not { } request)
-            return HubResponseBuilder.AwDangIt<SundesmoRequest>(SundouleiaApiEc.RequestExists);
+            return HubResponseBuilder.AwDangIt<SundesmoRequest>(SundouleiaApiEc.AlreadyExists);
 
         // Can cancel the request:
         var callerUser = await DbContext.Users.SingleAsync(u => u.UID == UserUID).ConfigureAwait(false);
@@ -183,6 +183,9 @@ public partial class SundouleiaHub
                 AllowAnimations = existingData!.OwnGlobals.DefaultAllowAnimations,
                 AllowSounds = existingData!.OwnGlobals.DefaultAllowSounds,
                 AllowVfx = existingData!.OwnGlobals.DefaultAllowVfx,
+                MoodleAccess = existingData!.OwnGlobals.DefaultMoodleAccess,
+                MaxMoodleTime = existingData!.OwnGlobals.DefaultMaxMoodleTime,
+                ShareOwnMoodles = existingData!.OwnGlobals.ShareOwnMoodles,
             };
             await DbContext.ClientPairPerms.AddAsync(newOwnPerms).ConfigureAwait(false);
         }
@@ -198,6 +201,9 @@ public partial class SundouleiaHub
                 AllowAnimations = existingData!.OtherGlobals.DefaultAllowAnimations,
                 AllowSounds = existingData!.OtherGlobals.DefaultAllowSounds,
                 AllowVfx = existingData!.OtherGlobals.DefaultAllowVfx,
+                MoodleAccess = existingData!.OtherGlobals.DefaultMoodleAccess,
+                MaxMoodleTime = existingData!.OtherGlobals.DefaultMaxMoodleTime,
+                ShareOwnMoodles = existingData!.OtherGlobals.ShareOwnMoodles,
             };
             await DbContext.ClientPairPerms.AddAsync(newOtherPerms).ConfigureAwait(false);
         }

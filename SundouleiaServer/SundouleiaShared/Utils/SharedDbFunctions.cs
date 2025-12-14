@@ -1,10 +1,8 @@
-﻿using SundouleiaAPI.Hub;
-using SundouleiaShared.Data;
+﻿using SundouleiaShared.Data;
 using SundouleiaShared.Metrics;
 using SundouleiaShared.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Prometheus;
 
 namespace SundouleiaShared.Utils;
 #nullable enable

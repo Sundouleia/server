@@ -27,6 +27,9 @@ public class PairRequest
     // If the request is for a temporary pairing, or a permanent one.
     public bool IsTemporary { get; set; } = false;
 
+    // Preferred nickname to assign to OtherUser upon acceptance.
+    public string PreferredNickname { get; set; } = string.Empty;
+
     // Optionally attached message.
     public string AttachedMessage { get; set; } = string.Empty;
 

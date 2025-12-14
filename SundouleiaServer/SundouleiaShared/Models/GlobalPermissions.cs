@@ -1,3 +1,4 @@
+using SundouleiaAPI.Enums;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -14,13 +15,18 @@ public class GlobalPermissions
     [ForeignKey(nameof(UserUID))]
     public virtual User User { get; set; }
 
-    // Various global settings a user can set.
-    // can probably figure this out as time goes on, but useful to have for the future.
-
-    // What is set initially upon adding someone.
+    // Default Sync-Related preferences when initializing a pair with someone.
     public bool DefaultAllowAnimations  { get; set; } = true;
     public bool DefaultAllowSounds      { get; set; } = true;
     public bool DefaultAllowVfx         { get; set; } = true;
+
+    // Default Moodles related permissions when initializing a pair with someone.
+    public MoodleAccess DefaultMoodleAccess     { get; set; } = MoodleAccess.None;
+    public TimeSpan     DefaultMaxMoodleTime    { get; set; } = TimeSpan.Zero;
+
+    // If we should share limited/full moodles information (avoid full for now)
+    public bool         ShareOwnMoodles         { get; set; } = false;
+
 
     // Other stuff that can be added later on..
 }
