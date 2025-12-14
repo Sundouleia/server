@@ -69,7 +69,6 @@ public static class Extensions
             DefaultAllowSounds = dbState.DefaultAllowSounds,
             DefaultAllowVfx = dbState.DefaultAllowVfx,
             DefaultMoodleAccess = dbState.DefaultMoodleAccess,
-            DefaultMaxMoodleTime = dbState.DefaultMaxMoodleTime,
             DefaultShareOwnMoodles = dbState.ShareOwnMoodles
         };
 

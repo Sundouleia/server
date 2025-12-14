@@ -184,7 +184,7 @@ public partial class SundouleiaHub
                 AllowSounds = existingData!.OwnGlobals.DefaultAllowSounds,
                 AllowVfx = existingData!.OwnGlobals.DefaultAllowVfx,
                 MoodleAccess = existingData!.OwnGlobals.DefaultMoodleAccess,
-                MaxMoodleTime = existingData!.OwnGlobals.DefaultMaxMoodleTime,
+                MaxMoodleTime = TimeSpan.Zero,
                 ShareOwnMoodles = existingData!.OwnGlobals.ShareOwnMoodles,
             };
             await DbContext.ClientPairPerms.AddAsync(newOwnPerms).ConfigureAwait(false);
@@ -202,7 +202,7 @@ public partial class SundouleiaHub
                 AllowSounds = existingData!.OtherGlobals.DefaultAllowSounds,
                 AllowVfx = existingData!.OtherGlobals.DefaultAllowVfx,
                 MoodleAccess = existingData!.OtherGlobals.DefaultMoodleAccess,
-                MaxMoodleTime = existingData!.OtherGlobals.DefaultMaxMoodleTime,
+                MaxMoodleTime = TimeSpan.Zero,
                 ShareOwnMoodles = existingData!.OtherGlobals.ShareOwnMoodles,
             };
             await DbContext.ClientPairPerms.AddAsync(newOtherPerms).ConfigureAwait(false);

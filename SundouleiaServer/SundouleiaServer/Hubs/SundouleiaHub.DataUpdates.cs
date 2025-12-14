@@ -116,6 +116,49 @@ public partial class SundouleiaHub
         await Clients.Users(recipientUids).Callback_PairMoodlePresetModified(new(new(UserUID), dto.Preset, dto.Deleted)).ConfigureAwait(false);
         return HubResponseBuilder.Yippee();
     }
+
+    [Authorize(Policy = "Identified")] // For forcing another sundesmo to apply a moodle.
+    public async Task<HubResponse> UserApplyMoodles(ApplyMoodleId dto)
+    {
+        // Fail if not paired. (Obtain permissions the target has for us)
+        if (await DbContext.ClientPairPerms.AsNoTracking().SingleOrDefaultAsync(u => u.UserUID == dto.User.UID && u.OtherUserUID == UserUID).ConfigureAwait(false) is not { } pairPerms)
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NotPaired);
+
+        // Fail if they do not apply own moodles to be applied.
+        if ((pairPerms.MoodleAccess & MoodleAccess.AllowOwn) == MoodleAccess.None)
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.RecipientBlocked);
+
+        // Apply it to them.
+        await Clients.User(dto.User.UID).Callback_ApplyMoodleId(new(new(UserUID), dto.Ids, dto.IsPresets)).ConfigureAwait(false);
+        return HubResponseBuilder.Yippee();
+    }
+
+    [Authorize(Policy = "Identified")] // For forcing another sundesmo to apply a moodle status.
+    public async Task<HubResponse> UserApplyMoodleTuples(ApplyMoodleStatus dto)
+    {
+        // Fail if not paired. (Obtain permissions the target has for us)
+        if (await DbContext.ClientPairPerms.AsNoTracking().SingleOrDefaultAsync(u => u.UserUID == dto.User.UID && u.OtherUserUID == UserUID).ConfigureAwait(false) is not { } pairPerms)
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NotPaired);
+
+        // Fail if they do not apply own moodles to be applied.
+        if ((pairPerms.MoodleAccess & MoodleAccess.AllowOther) == MoodleAccess.None)
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.RecipientBlocked);
+        
+        // Apply it to them.
+        await Clients.User(dto.User.UID).Callback_ApplyMoodleStatus(new(new(UserUID), dto.Statuses)).ConfigureAwait(false);
+        return HubResponseBuilder.Yippee();
+    }
+
+    [Authorize(Policy = "Identified")] // For forcing another sundesmo to remove a moodle.
+    public async Task<HubResponse> UserRemoveMoodles(RemoveMoodleId dto)
+    {
+        // Fail if not paired. (Obtain permissions the target has for us)
+        if (await DbContext.ClientPairPerms.AsNoTracking().SingleOrDefaultAsync(u => u.UserUID == dto.User.UID && u.OtherUserUID == UserUID).ConfigureAwait(false) is not { } pairPerms)
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NotPaired);
+        // Remove it from them.
+        await Clients.User(dto.User.UID).Callback_RemoveMoodleId(new(new(UserUID), dto.Ids)).ConfigureAwait(false);
+        return HubResponseBuilder.Yippee();
+    }
     #endregion M O O D L E S
 
     [Authorize(Policy = "Identified")]
