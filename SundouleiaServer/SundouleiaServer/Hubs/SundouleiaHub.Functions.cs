@@ -21,27 +21,21 @@ public partial class SundouleiaHub
     ///     The FileHost will return download links for any that exist, and authorized upload links for those that do not. <para />
     ///     These are both returned in the resulting record, and should be handled accordingly.
     /// </summary>
-    private async Task<ModFileUrlResult> RequestFiles(List<ModFile> newMods)
+    private async Task<ModFileUrlResult> RequestFiles(List<FileHashData> newMods)
     {
         // These contain the authorized upload links to send back to the client caller.
-        var requiresUpload = new List<VerifiedModFile>();
-        var validMods = new List<VerifiedModFile>();
+        var requiresUpload = new List<ValidFileHash>();
+        var validMods = new List<ValidFileHash>();
 
-        // Remove swapped files that do not contain files to transfer and add them to the valid mods list to be sent directly to the user
-        foreach (var mod in newMods.Where(m => !string.IsNullOrEmpty(m.SwappedPath)).ToList())
-        {
-            newMods.Remove(mod);
-            validMods.Add(new(mod.Hash, string.Empty, mod.GamePaths, mod.SwappedPath));
-        }
         var urlInfo = await _fileHost.GetUploadUrlsAsync(newMods.Select(m => m.Hash)).ConfigureAwait(false);
 
         // Iterate through all of the new mods and filter them accordingly based on their resulting dictionary outcomes.
         foreach (var modToAdd in newMods)
         {
             if (urlInfo.DownloadUrl.TryGetValue(modToAdd.Hash, out var dlLink))
-                validMods.Add(new(modToAdd.Hash, dlLink, modToAdd.GamePaths, modToAdd.SwappedPath));
+                validMods.Add(new(modToAdd.Hash, modToAdd.GamePaths, dlLink));
             else if (urlInfo.UploadUrl.TryGetValue(modToAdd.Hash, out var ulLink))
-                requiresUpload.Add(new(modToAdd.Hash, ulLink, modToAdd.GamePaths, modToAdd.SwappedPath));
+                requiresUpload.Add(new(modToAdd.Hash, modToAdd.GamePaths, ulLink));
         }
         // return the record containing the resulting lists.
         return new(validMods, requiresUpload);

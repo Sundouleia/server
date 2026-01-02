@@ -18,17 +18,21 @@ public partial class SundouleiaHub
     // Pushes an update to mod and non-mod visual data to online pairs.
     // Currently non-functional.
     [Authorize(Policy = "Identified")]
-    public async Task<HubResponse<List<VerifiedModFile>>> UserPushIpcFull(PushIpcFull dto)
+    public async Task<HubResponse<List<ValidFileHash>>> UserPushIpcFull(PushIpcFull dto)
     {
         var recipientUids = dto.Recipients.Select(r => r.UID).ToList();
         _logger.LogCallInfo(SundouleiaHubLogger.Args(recipientUids.Count));
 
         // Request the download links for all of the new files to be added.
-        var requestResult = await RequestFiles(dto.Mods.FilesToAdd).ConfigureAwait(false);
+        var requestResult = await RequestFiles(dto.Mods.NewReplacements).ConfigureAwait(false);
+        var modCallbackDto = new NewModUpdates(requestResult.DownloadFiles, dto.Mods.NewSwaps, requestResult.RequiresUpload.Count)
+        {
+            HashesToRemove = dto.Mods.HashesToRemove,
+            SwapsToRemove = dto.Mods.SwapsToRemove
+        };
         
         // compose the new return dto based off the resulting request.
-        var newModUpdatesDto = new NewModUpdates(requestResult.DownloadFiles, dto.Mods.HashesToRemove, requestResult.RequiresUpload.Count);
-        await Clients.Users(recipientUids).Callback_IpcUpdateFull(new(new(UserUID), newModUpdatesDto, dto.Visuals, dto.IsInitialData)).ConfigureAwait(false);
+        await Clients.Users(recipientUids).Callback_IpcUpdateFull(new(new(UserUID), modCallbackDto, dto.Visuals, dto.IsInitialData)).ConfigureAwait(false);
         
         // Inc metrics and return the remaining files to be uploaded to the server.
         _metrics.IncCounter(MetricsAPI.CounterDataUpdateAll);
@@ -37,17 +41,20 @@ public partial class SundouleiaHub
 
     // Pushes an update to all mod visual data to online pairs.
     [Authorize(Policy = "Identified")]
-    public async Task<HubResponse<List<VerifiedModFile>>> UserPushIpcMods(PushIpcMods dto)
+    public async Task<HubResponse<List<ValidFileHash>>> UserPushIpcMods(PushIpcMods dto)
     {
         var recipientUids = dto.Recipients.Select(r => r.UID).ToList();
         _logger.LogCallInfo(SundouleiaHubLogger.Args(recipientUids.Count));
 
         // Request the download links for all of the new files to be added.
-        var requestResult = await RequestFiles(dto.Mods.FilesToAdd).ConfigureAwait(false);
-
+        var requestResult = await RequestFiles(dto.Mods.NewReplacements).ConfigureAwait(false);
+        var modCallbackDto = new NewModUpdates(requestResult.DownloadFiles, dto.Mods.NewSwaps, requestResult.RequiresUpload.Count)
+        {
+            HashesToRemove = dto.Mods.HashesToRemove,
+            SwapsToRemove = dto.Mods.SwapsToRemove
+        };
         // compose the new return dto based off the resulting request.
-        var newModUpdatesDto = new NewModUpdates(requestResult.DownloadFiles, dto.Mods.HashesToRemove, requestResult.RequiresUpload.Count);
-        await Clients.Users(recipientUids).Callback_IpcUpdateMods(new(new(UserUID), newModUpdatesDto, dto.ManipString)).ConfigureAwait(false);
+        await Clients.Users(recipientUids).Callback_IpcUpdateMods(new(new(UserUID), modCallbackDto, dto.ManipString)).ConfigureAwait(false);
 
         // Inc metrics and return the remaining files to be uploaded to the server.
         _metrics.IncCounter(MetricsAPI.CounterDataUpdateMods);
