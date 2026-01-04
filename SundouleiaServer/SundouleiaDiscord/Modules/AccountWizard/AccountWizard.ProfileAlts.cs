@@ -56,7 +56,7 @@ public partial class AccountWizard
     public async Task HandleAddAltProfile(SundouleiaDbContext db, EmbedBuilder embed, string primaryUID)
     {
         // Locate the account's main profile user.
-        var accountMain = await db.AccountReputation.Include(r => r.User).AsNoTracking().SingleAsync(r => r.UserUID == primaryUID).ConfigureAwait(false);
+        var accountRep = await db.AccountReputation.Include(r => r.User).AsNoTracking().SingleAsync(r => r.UserUID == primaryUID).ConfigureAwait(false);
 
         // while the UID is not unique, generate a new one.
         var hasValidUid = false;
@@ -76,7 +76,7 @@ public partial class AccountWizard
             UID = generatedUid,
             CreatedAt = DateTime.UtcNow,
             LastLogin = DateTime.UtcNow,
-            Tier = accountMain.User.Tier
+            Tier = accountRep.User.Tier
         };
         // compute the secret key for the user, and initialize the auth as an alt character profile, linking it to the primary account.
         var computedHash = StringUtils.Sha256String(StringUtils.GenerateRandomString(64) + DateTime.UtcNow.ToString(CultureInfo.InvariantCulture));
@@ -86,15 +86,12 @@ public partial class AccountWizard
             UserUID = newUser.UID,
             User = newUser,
             PrimaryUserUID = primaryUID,
-            PrimaryUser = accountMain.User,
-            AccountRep = accountMain
+            PrimaryUser = accountRep.User,
+            AccountRep = accountRep
         };
 
-        // add the rows to the user and the auth tables in the database, and save the changes.
-        await db.Users.AddAsync(newUser).ConfigureAwait(false);
-        await db.Auth.AddAsync(auth).ConfigureAwait(false);
-        await db.SaveChangesAsync().ConfigureAwait(false);
-
+        // Create through the shared DB functions.
+        await SharedDbFunctions.CreateAltProfile(newUser, auth, _logger, db).ConfigureAwait(false);
         // output the window contents.
         embed.WithDescription("Copy the Secret Key Provided below and paste it in the Account Creation Section of your Sundouleia Settings for the character you wish to add it to.");
         embed.AddField("UID", newUser.UID);

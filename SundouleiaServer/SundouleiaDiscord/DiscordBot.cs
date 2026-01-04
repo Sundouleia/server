@@ -467,7 +467,6 @@ internal partial class DiscordBot : IHostedService
 
     /// <summary> 
     ///     Removes the VanityPerks from users who are no longer supporting CK / Sundouleia <para />
-    ///     
     ///     Note that this is still a WIP as I determine how to cross reference rolls from the other Guild.
     /// </summary>
     private async Task RemovePerksFromUsersNotInVanityRole(RestGuild sundouleiaGuild, RestGuild ckGuid, CancellationToken token)

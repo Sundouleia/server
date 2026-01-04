@@ -34,7 +34,7 @@ public static class SharedDbFunctions
     /// </summary>
     /// <returns> a dictionary linking the removed userUID's to the list of UID's paired with them. Dictionary is used incase primary profile is removed. </returns>
     /// <exception cref="ArgumentNullException">Thrown when the auth is null.</exception>
-    public static async Task<Dictionary<string, List<string>>> DeleteUserProfile(User user, ILogger logger, SundouleiaDbContext dbContext, SundouleiaMetrics? metrics = null)
+    public static async Task<Dictionary<string, List<string>>>  DeleteUserProfile(User user, ILogger logger, SundouleiaDbContext dbContext, SundouleiaMetrics? metrics = null)
     {
         var retDict = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         // Obtain the caller's Auth entry, which contains the User entry inside.

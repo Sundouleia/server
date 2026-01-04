@@ -10,5 +10,4 @@ internal record SecretKeyFailedAuthorization
     public int FailedAttempts => failedAttempts;
     public Task? ResetTask { get; set; }
     public void IncreaseFailedAttempts() => Interlocked.Increment(ref failedAttempts);
-
 }

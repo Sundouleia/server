@@ -114,10 +114,8 @@ public partial class SundouleiaHub
     /// <summary> 
     ///     Triggered whenever the recipient of a request accepts it. <para />
     ///     Bare in mind that due to the way this is called, the person accepting is the request entry <b>TARGET</b>. <para />
-    ///     
-    ///     If the caller receives the EC "AlreadyPaired", they should remove the request from their pending list.
+    ///     <b>If caller receives "AlreadyPaired", they should remove the request from their list.</b>
     /// </summary>
-    /// <returns> The new UserPair to add, if the request was properly accepted.</returns>
     [Authorize(Policy = "Identified")]
     public async Task<HubResponse<AddedUserPair>> UserAcceptRequest(UserDto dto)
     {
