@@ -1,5 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
+using SundouleiaAPI.Data;
 using SundouleiaAPI.Enums;
 using SundouleiaAPI.Hub;
 using SundouleiaAPI.Network;
@@ -7,6 +10,7 @@ using SundouleiaServer.Utils;
 using SundouleiaShared.Metrics;
 using SundouleiaShared.Models;
 using SundouleiaShared.Utils;
+using System.Reflection;
 
 namespace SundouleiaServer.Hubs;
 #nullable enable
@@ -111,6 +115,40 @@ public partial class SundouleiaHub
         return HubResponseBuilder.Yippee();
     }
 
+    [Authorize(Policy = "Identified")]
+    public async Task<HubResponse> UserCancelRequests(UserListDto dto)
+    {
+        _logger.LogCallInfo(SundouleiaHubLogger.Args(dto));
+        var targetUids = dto.Users.Select(u => u.UID.Trim()).ToList();
+
+        // Fetch all request information in bulk using psql query language.
+        var dbRequests = await GetSentRequests(targetUids).ConfigureAwait(false);
+
+        // If none exist, return null data.
+        if (dbRequests.Count == 0)
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NullData);
+
+        // Prepare the callback DTO's for our callback notifications.
+        var callbacks = dbRequests
+            .Select(kvp => Extensions.ToApiRemoval(new(UserUID), new(kvp.Key)))
+            .ToList();
+
+        // Notify the online users.
+        foreach (var callback in callbacks)
+        {
+            if (await GetUserIdent(callback.Target.UID).ConfigureAwait(false) is not null)
+                await Clients.User(callback.Target.UID).Callback_RemoveRequest(callback).ConfigureAwait(false);
+        }
+
+        // Remove all requests in bulk.
+        DbContext.Requests.RemoveRange(dbRequests.Values);
+        await DbContext.SaveChangesAsync().ConfigureAwait(false);
+
+        _metrics.DecGauge(MetricsAPI.GaugeRequestsPending, dbRequests.Count);
+        return HubResponseBuilder.Yippee();
+    }
+
+
     /// <summary> 
     ///     Triggered whenever the recipient of a request accepts it. <para />
     ///     Bare in mind that due to the way this is called, the person accepting is the request entry <b>TARGET</b>. <para />
@@ -183,7 +221,7 @@ public partial class SundouleiaHub
                 AllowVfx = existingData!.OwnGlobals.DefaultAllowVfx,
                 MoodleAccess = existingData!.OwnGlobals.DefaultMoodleAccess,
                 MaxMoodleTime = TimeSpan.Zero,
-                ShareOwnMoodles = existingData!.OwnGlobals.ShareOwnMoodles,
+                ShareOwnMoodles = existingData!.OwnGlobals.DefaultShareOwnMoodles,
             };
             await DbContext.ClientPairPerms.AddAsync(newOwnPerms).ConfigureAwait(false);
         }
@@ -201,7 +239,7 @@ public partial class SundouleiaHub
                 AllowVfx = existingData!.OtherGlobals.DefaultAllowVfx,
                 MoodleAccess = existingData!.OtherGlobals.DefaultMoodleAccess,
                 MaxMoodleTime = TimeSpan.Zero,
-                ShareOwnMoodles = existingData!.OtherGlobals.ShareOwnMoodles,
+                ShareOwnMoodles = existingData!.OtherGlobals.DefaultShareOwnMoodles,
             };
             await DbContext.ClientPairPerms.AddAsync(newOtherPerms).ConfigureAwait(false);
         }
@@ -248,7 +286,144 @@ public partial class SundouleiaHub
         var retValue = new AddedUserPair(callerRetDto, requesterIdentity != null ? new OnlineUser(target.ToUserData(), requesterIdentity) : null);
         return HubResponseBuilder.Yippee(retValue);
     }
-    
+
+    [Authorize(Policy = "Identified")]
+    public async Task<HubResponse<List<AddedUserPair>>> UserAcceptRequests(UserListDto toAccept)
+    {
+        _logger.LogCallInfo(SundouleiaHubLogger.Args(toAccept));
+        var senderUids = toAccept.Users.Select(u => u.UID.Trim()).ToList();
+        senderUids.Remove(UserUID); // Pre-fire removing self
+
+        if (senderUids.Count == 0)
+            return HubResponseBuilder.AwDangIt<List<AddedUserPair>>(SundouleiaApiEc.NullData);
+
+        // Single query: requests + user + globals
+        var requests = await GetRespondingRequests(senderUids).ConfigureAwait(false);
+
+        if (requests.Count == 0)
+            return HubResponseBuilder.AwDangIt<List<AddedUserPair>>(SundouleiaApiEc.NullData);
+
+        // Build what we are returning.
+        var now = DateTime.UtcNow;
+        var callerUser = await DbContext.Users.SingleAsync(u => u.UID == UserUID).ConfigureAwait(false);
+        var onlineUsers = await GetOnlineUsers(senderUids).ConfigureAwait(false);
+        
+        var addedPairs = new List<AddedUserPair>(requests.Count);
+
+        // Process each request one by one, without extra queries.
+        foreach (var (senderUid, info) in requests)
+        {
+            var request = info.Request;
+            var wasTemp = request.IsTemporary;
+
+            // Create pairs
+            var callerToTarget = new ClientPair
+            {
+                User = callerUser,
+                OtherUser = info.Sender,
+                CreatedAt = now,
+                TempAccepterUID = wasTemp ? UserUID : string.Empty
+            };
+
+            var targetToCaller = new ClientPair
+            {
+                User = info.Sender,
+                OtherUser = callerUser,
+                CreatedAt = now,
+                TempAccepterUID = wasTemp ? UserUID : string.Empty
+            };
+
+            DbContext.ClientPairs.AddRange(callerToTarget, targetToCaller);
+
+            // Create perms (always new in bulk accept)
+            var ownPerms = new ClientPairPermissions
+            {
+                User = callerUser,
+                OtherUser = info.Sender,
+                PauseVisuals = false,
+                AllowAnimations = info.RecipientGlobals.DefaultAllowAnimations,
+                AllowSounds = info.RecipientGlobals.DefaultAllowSounds,
+                AllowVfx = info.RecipientGlobals.DefaultAllowVfx,
+                MoodleAccess = info.RecipientGlobals.DefaultMoodleAccess,
+                MaxMoodleTime = info.RecipientGlobals.DefaultMaxMoodleTime,
+                ShareOwnMoodles = info.RecipientGlobals.DefaultShareOwnMoodles,
+            };
+
+            var otherPerms = new ClientPairPermissions
+            {
+                User = info.Sender,
+                OtherUser = callerUser,
+                PauseVisuals = false,
+                AllowAnimations = info.SenderGlobals.DefaultAllowAnimations,
+                AllowSounds = info.SenderGlobals.DefaultAllowSounds,
+                AllowVfx = info.SenderGlobals.DefaultAllowVfx,
+                MoodleAccess = info.SenderGlobals.DefaultMoodleAccess,
+                MaxMoodleTime = info.SenderGlobals.DefaultMaxMoodleTime,
+                ShareOwnMoodles = info.SenderGlobals.DefaultShareOwnMoodles,
+            };
+
+            DbContext.ClientPairPerms.AddRange(ownPerms, otherPerms);
+            DbContext.Requests.Remove(request);
+
+            // Build return DTO (caller perspective)
+            var callerRetDto = new UserPair(
+                request.User!.ToUserData(),
+                ownPerms.ToApi(),
+                info.SenderGlobals.ToApi(),
+                otherPerms.ToApi(),
+                DateTime.UtcNow,
+                wasTemp ? UserUID : string.Empty
+            );
+
+            // Inform other if online.
+            if (onlineUsers.TryGetValue(senderUid, out var ident))
+            {
+                // Online user.
+                addedPairs.Add(new(callerRetDto, new(info.Sender.ToUserData(), ident)));
+                // Return for the request sender.
+                var senderRetDto = new UserPair(
+                    callerUser.ToUserData(),
+                    otherPerms.ToApi(),
+                    info.RecipientGlobals.ToApi(),
+                    ownPerms.ToApi(),
+                    DateTime.UtcNow,
+                    wasTemp ? UserUID : string.Empty
+                );
+                await Clients.User(senderUid).Callback_RemoveRequest(Extensions.ToApiRemoval(new(senderUid), new(UserUID))).ConfigureAwait(false);
+                await Clients.User(senderUid).Callback_AddPair(senderRetDto).ConfigureAwait(false);
+                await Clients.User(senderUid).Callback_UserOnline(new(callerUser.ToUserData(), UserCharaIdent)).ConfigureAwait(false);
+            }
+            // Otherwise, simply add.
+            else
+            {
+                addedPairs.Add(new(callerRetDto, null));
+            }
+            // Get if the request creator is online of not.
+            var requesterIdentity = await GetUserIdent(senderUid).ConfigureAwait(false);
+            // If the request creator is online, send them the remove request and add pair callbacks, and also return sendOnline to both.
+            if (requesterIdentity is not null)
+            {
+                var requesterRetDto = new UserPair(
+                    callerUser.ToUserData(),
+                    otherPerms.ToApi(),
+                    info.RecipientGlobals.ToApi(),
+                    ownPerms.ToApi(),
+                    DateTime.UtcNow,
+                    wasTemp ? UserUID : string.Empty
+                );
+                await Clients.User(senderUid).Callback_RemoveRequest(Extensions.ToApiRemoval(new(senderUid), new(UserUID))).ConfigureAwait(false);
+                await Clients.User(senderUid).Callback_AddPair(requesterRetDto).ConfigureAwait(false);
+                await Clients.User(senderUid).Callback_UserOnline(new(callerUser.ToUserData(), UserCharaIdent)).ConfigureAwait(false);
+            }
+        }
+
+        // Update metrics and return.
+        _metrics.IncCounter(MetricsAPI.CounterRequestsAccepted, requests.Count);
+        _metrics.DecGauge(MetricsAPI.GaugeRequestsPending, requests.Count);
+
+        return HubResponseBuilder.Yippee(addedPairs);
+    }
+
     /// <summary>
     ///     Whenever a pending request is rejected by the target recipient. <para />
     ///     You are expected to remove the request from your pending list if successful. (Helps save extra server calls)
@@ -276,6 +451,40 @@ public partial class SundouleiaHub
 
         _metrics.IncCounter(MetricsAPI.CounterRequestsRejected);
         _metrics.DecGauge(MetricsAPI.GaugeRequestsPending);
+        return HubResponseBuilder.Yippee();
+    }
+
+    [Authorize(Policy = "Identified")]
+    public async Task<HubResponse> UserRejectRequests(UserListDto toReject)
+    {
+        _logger.LogCallInfo(SundouleiaHubLogger.Args(toReject));
+        var requesterUids = toReject.Users.Select(u => u.UID.Trim()).ToHashSet(StringComparer.Ordinal);
+
+        // Fetch all requests where the current user is the target.
+        var dbRequests = await DbContext.Requests
+            .AsNoTracking()
+            .Where(r => r.OtherUserUID == UserUID && requesterUids.Contains(r.UserUID))
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        // If none exist, return not found, note that even if not all request exists,
+        // the caller should still remove all after, as they no longer exist on the server.
+        if (dbRequests.Count == 0)
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.RequestNotFound);
+
+        // Notify each requester if they are online.
+        foreach (var request in dbRequests)
+        {
+            if (await GetUserIdent(request.UserUID).ConfigureAwait(false) is not null)
+                await Clients.User(request.UserUID).Callback_RemoveRequest(request.ToApi()).ConfigureAwait(false);
+        }
+
+        // Remove all requests in bulk.
+        DbContext.Requests.RemoveRange(dbRequests);
+        await DbContext.SaveChangesAsync().ConfigureAwait(false);
+
+        _metrics.IncCounter(MetricsAPI.CounterRequestsRejected, dbRequests.Count);
+        _metrics.DecGauge(MetricsAPI.GaugeRequestsPending, dbRequests.Count);
         return HubResponseBuilder.Yippee();
     }
 
@@ -314,6 +523,122 @@ public partial class SundouleiaHub
         // return success to the caller, informing them they can update this pair to permanent.
         return HubResponseBuilder.Yippee();
     }
+
+    /// <summary>
+    ///     When the caller wishes to remove the specified user from their client pairs. <para />
+    ///     If successful, you should remove the pair from your list of pairs.
+    /// </summary>
+    /// <remarks> THIS SHOULD ENSURE THAT THE PAIR PERMISSIONS FOR A CLIENT PAIR ARE ALWAYS DELETED PROPERLY!!!</remarks>
+    [Authorize(Policy = "Identified")]
+    public async Task<HubResponse> UserRemovePair(UserDto dto)
+    {
+        _logger.LogCallInfo(SundouleiaHubLogger.Args(dto));
+
+        // Prevent removing self.
+        if (string.Equals(dto.User.UID, UserUID, StringComparison.Ordinal))
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.InvalidRecipient);
+
+        // Prevent processing if not paired.
+        if (await DbContext.ClientPairs.AsNoTracking().SingleOrDefaultAsync(w => w.UserUID == UserUID && w.OtherUserUID == dto.User.UID).ConfigureAwait(false) is not { } callerPair)
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NotPaired);
+
+        // Retrieve the additional info for the connection between the caller and target.
+        UserInfo? pairData = await GetPairInfo(UserUID, dto.User.UID).ConfigureAwait(false);
+
+        // Remove the caller -> Target relation table entries.
+        DbContext.ClientPairs.Remove(callerPair);
+        if (pairData?.OwnPerms is not null) DbContext.ClientPairPerms.Remove(pairData.OwnPerms);
+
+        // Remove the target -> Caller relation table entries.
+        if (await DbContext.ClientPairs.AsNoTracking().SingleOrDefaultAsync(w => w.UserUID == dto.User.UID && w.OtherUserUID == UserUID).ConfigureAwait(false) is { } otherPair)
+        {
+            DbContext.ClientPairs.Remove(otherPair);
+            if (pairData?.OtherPerms is not null) DbContext.ClientPairPerms.Remove(pairData.OtherPerms);
+        }
+
+        // Update DB.
+        await DbContext.SaveChangesAsync().ConfigureAwait(false);
+
+        // If the target is online, send to them the remove pair callback.
+        if (await GetUserIdent(dto.User.UID).ConfigureAwait(false) is not null)
+            await Clients.User(dto.User.UID).Callback_RemovePair(new(new(UserUID))).ConfigureAwait(false);
+
+        return HubResponseBuilder.Yippee();
+    }
+
+    public async Task<HubResponse> UserRemovePairs(UserListDto toRemove)
+    {
+        _logger.LogCallInfo(SundouleiaHubLogger.Args(toRemove));
+        // Hashset for O(1) lookup efficiency.
+        var targetUids = toRemove.Users.Select(u => u.UID.Trim()).ToHashSet(StringComparer.Ordinal);
+        targetUids.Remove(UserUID);
+
+        // "Then draw the rest of the picture"
+        var pairsAndPerms = await (
+            from up in DbContext.ClientPairs.AsNoTracking().Where(cp => cp.UserUID == UserUID && targetUids.Contains(cp.OtherUserUID))
+            join tp in DbContext.ClientPairs.AsNoTracking().Where(cp => cp.OtherUserUID == UserUID && targetUids.Contains(cp.UserUID))
+                on up.OtherUserUID equals tp.UserUID into joined
+            from tp in joined.DefaultIfEmpty()
+
+            join ownperm in DbContext.ClientPairPerms.AsNoTracking().Where(p => p.UserUID == UserUID && targetUids.Contains(p.OtherUserUID))
+                on new { up.UserUID, up.OtherUserUID } equals new { ownperm.UserUID, ownperm.OtherUserUID } into ownperms
+            from ownperm in ownperms.DefaultIfEmpty()
+
+            join otherperm in DbContext.ClientPairPerms.AsNoTracking().Where(p => p.OtherUserUID == UserUID && targetUids.Contains(p.UserUID))
+                on new { tp.UserUID, tp.OtherUserUID } equals new { otherperm.UserUID, otherperm.OtherUserUID } into otherperms
+            from otherperm in otherperms.DefaultIfEmpty()
+
+            select new
+            {
+                OtherUid = up.OtherUserUID,
+                CallerPair = up,
+                TargetPair = tp,
+                OwnPerms = ownperm,
+                OtherPerms = otherperm
+            }
+        ).ToListAsync().ConfigureAwait(false);
+
+        if (pairsAndPerms.Count == 0)
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NullData);
+
+        // Bulk Remove.
+        DbContext.ClientPairs.RemoveRange(pairsAndPerms.Select(x => x.CallerPair));
+        DbContext.ClientPairs.RemoveRange(pairsAndPerms.Where(x => x.TargetPair != null).Select(x => x.TargetPair!));
+        DbContext.ClientPairPerms.RemoveRange(pairsAndPerms.Where(x => x.OwnPerms != null).Select(x => x.OwnPerms!));
+        DbContext.ClientPairPerms.RemoveRange(pairsAndPerms.Where(x => x.OtherPerms != null).Select(x => x.OtherPerms!));
+        await DbContext.SaveChangesAsync().ConfigureAwait(false);
+
+        // Inform Online Users of the removal.
+        if (pairsAndPerms.Count > 0)
+            await Clients.Users(pairsAndPerms.Select(p => p.OtherUid)).Callback_RemovePair(new(new(UserUID))).ConfigureAwait(false);
+
+        return HubResponseBuilder.Yippee();
+    }
+
+    /// <summary> 
+    ///     When the caller wishes to commit seppuku to their profile. <para/>
+    ///     If the profile being deleted is the account's primary profile,
+    ///     all secondary profiles are deleted with it.
+    /// </summary>
+    [Authorize(Policy = "Identified")]
+    public async Task<HubResponse> UserDelete()
+    {
+        _logger.LogCallInfo(SundouleiaHubLogger.Args());
+
+        // Prevent deleting that which is already deleted.
+        if (await DbContext.Users.AsNoTracking().SingleOrDefaultAsync(a => a.UID == UserUID).ConfigureAwait(false) is not { } caller)
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NullData);
+
+        // Delete the profile(s) from the database, and obtain a dictionary of all the removed profiles and their paired UID's.
+        var pairRemovals = await SharedDbFunctions.DeleteUserProfile(caller, _logger.Logger, DbContext, _metrics).ConfigureAwait(false);
+
+        // pairRemovals is a dict of each uid that was removed, and all of those uid's pairs that should receive Callback_RemovePair
+        foreach (var (deletedProfile, profilePairUids) in pairRemovals)
+            await Clients.Users(profilePairUids).Callback_RemovePair(new(new(deletedProfile))).ConfigureAwait(false);
+
+        return HubResponseBuilder.Yippee();
+    }
+
 
     [Authorize(Policy = "Identified")]
     public async Task<HubResponse> UserBlock(UserDto dto)
@@ -362,71 +687,6 @@ public partial class SundouleiaHub
         DbContext.BlockedUsers.Remove(blockEntry);
         await DbContext.SaveChangesAsync().ConfigureAwait(false);
         _metrics.IncCounter(MetricsAPI.CounterUsersUnblocked);
-        return HubResponseBuilder.Yippee();
-    }
-
-    /// <summary>
-    ///     When the caller wishes to remove the specified user from their client pairs. <para />
-    ///     If successful, you should remove the pair from your list of pairs.
-    /// </summary>
-    [Authorize(Policy = "Identified")]
-    public async Task<HubResponse> UserRemovePair(UserDto dto)
-    {
-        _logger.LogCallInfo(SundouleiaHubLogger.Args(dto));
-
-        // Prevent removing self.
-        if (string.Equals(dto.User.UID, UserUID, StringComparison.Ordinal))
-            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.InvalidRecipient);
-
-        // Prevent processing if not paired.
-        if (await DbContext.ClientPairs.AsNoTracking().SingleOrDefaultAsync(w => w.UserUID == UserUID && w.OtherUserUID == dto.User.UID).ConfigureAwait(false) is not { } callerPair)
-            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NotPaired);
-
-        // Retrieve the additional info for the connection between the caller and target.
-        UserInfo? pairData = await GetPairInfo(UserUID, dto.User.UID).ConfigureAwait(false);
-
-        // Remove the caller -> Target relation table entries.
-        DbContext.ClientPairs.Remove(callerPair);
-        if (pairData?.OwnPerms is not null) DbContext.ClientPairPerms.Remove(pairData.OwnPerms);
-
-        // Remove the target -> Caller relation table entries.
-        if (await DbContext.ClientPairs.AsNoTracking().SingleOrDefaultAsync(w => w.UserUID == dto.User.UID && w.OtherUserUID == UserUID).ConfigureAwait(false) is { } otherPair)
-        {
-            DbContext.ClientPairs.Remove(otherPair);
-            if (pairData?.OtherPerms is not null) DbContext.ClientPairPerms.Remove(pairData.OtherPerms);
-        }
-
-        // Update DB.
-        await DbContext.SaveChangesAsync().ConfigureAwait(false);
-
-        // If the target is online, send to them the remove pair callback.
-        if (await GetUserIdent(dto.User.UID).ConfigureAwait(false) is not null)
-             await Clients.User(dto.User.UID).Callback_RemovePair(new(new(UserUID))).ConfigureAwait(false);
-        
-        return HubResponseBuilder.Yippee();
-    }
-
-    /// <summary> 
-    ///     When the caller wishes to commit seppuku to their profile. <para/>
-    ///     If the profile being deleted is the account's primary profile,
-    ///     all secondary profiles are deleted with it.
-    /// </summary>
-    [Authorize(Policy = "Identified")]
-    public async Task<HubResponse> UserDelete()
-    {
-        _logger.LogCallInfo(SundouleiaHubLogger.Args());
-
-        // Prevent deleting that which is already deleted.
-        if (await DbContext.Users.AsNoTracking().SingleOrDefaultAsync(a => a.UID == UserUID).ConfigureAwait(false) is not { } caller)
-            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NullData);
-
-        // Delete the profile(s) from the database, and obtain a dictionary of all the removed profiles and their paired UID's.
-        var pairRemovals = await SharedDbFunctions.DeleteUserProfile(caller, _logger.Logger, DbContext, _metrics).ConfigureAwait(false);
-
-        // pairRemovals is a dict of each uid that was removed, and all of those uid's pairs that should receive Callback_RemovePair
-        foreach (var (deletedProfile, profilePairUids) in pairRemovals)
-            await Clients.Users(profilePairUids).Callback_RemovePair(new(new(deletedProfile))).ConfigureAwait(false);
-
         return HubResponseBuilder.Yippee();
     }
 

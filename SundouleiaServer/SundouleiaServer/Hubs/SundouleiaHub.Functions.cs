@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SundouleiaAPI.Data;
 using SundouleiaAPI.Enums;
+using SundouleiaAPI.Network;
 using SundouleiaShared.Models;
 using SundouleiaShared.Utils;
 
@@ -240,6 +241,57 @@ public partial class SundouleiaHub
         );
     }
 
+    public async Task<Dictionary<string, RequestInfo>> GetRespondingRequests(IEnumerable<string> uids)
+    {
+        var targets = uids.ToHashSet(StringComparer.Ordinal);
+        if (targets.Count == 0)
+            return new Dictionary<string, RequestInfo>(StringComparer.Ordinal);
+
+        var info =  from r in DbContext.Requests.AsNoTracking().Where(r => r.OtherUserUID == UserUID && targets.Contains(r.UserUID))
+                    join sender in DbContext.Users.AsNoTracking()
+                        on r.UserUID equals sender.UID
+                    join senderGlobals in DbContext.UserGlobalPerms.AsNoTracking()
+                        on r.UserUID equals senderGlobals.UserUID
+                    join targetGlobals in DbContext.UserGlobalPerms.AsNoTracking()
+                        on UserUID equals targetGlobals.UserUID
+                    select new
+                    {
+                        TargetUid = r.UserUID,
+                        Sender = sender,
+                        Request = r,
+                        SenderGlobals = senderGlobals,
+                        TargetGlobals = targetGlobals
+                    };
+
+        var infoResult = await info.AsNoTracking().ToListAsync().ConfigureAwait(false);
+
+        // Might need to reformat to work more like below.
+        return infoResult.ToDictionary(x => x.TargetUid, 
+            x => new RequestInfo(x.Request, x.Sender, x.SenderGlobals, x.TargetGlobals), StringComparer.Ordinal);
+    }
+
+
+    private async Task<Dictionary<string, PairRequest>> GetSentRequests(IEnumerable<string> uids)
+    {
+        var targets = uids.ToHashSet(StringComparer.Ordinal);
+        // Query all existing requests in one go
+        var requestsQuery = from req in DbContext.Requests.AsNoTracking()
+                            join tgt in DbContext.Users.AsNoTracking() 
+                            on req.OtherUserUID equals tgt.UID 
+                            where req.UserUID == UserUID && targets.Contains(req.OtherUserUID)
+                            select new
+                            {
+                                Request = req,
+                                TargetUid = tgt.UID,
+                                TargetAlias = tgt.Alias,
+                                TargetCreatedAt = tgt.CreatedAt
+                            };
+
+        var requestsList = await requestsQuery.ToListAsync().ConfigureAwait(false);
+
+        // Form dictionary keyed by target UID
+        return requestsList.ToDictionary(x => x.TargetUid, x => x.Request, StringComparer.Ordinal);
+    }
 
     /// <summary>
     ///     Helper function to retrieve the UserInfo's for ALL pairs of a specific UID. <para />
@@ -403,6 +455,7 @@ public partial class SundouleiaHub
         return await resultingInfo.Distinct().AsNoTracking().ToListAsync().ConfigureAwait(false);
     }
 
+    public record RequestInfo(PairRequest Request, User Sender, GlobalPermissions SenderGlobals, GlobalPermissions RecipientGlobals);
 
     public record UserInfo(string Alias, CkVanityTier Tier, DateTime Created, GlobalPermissions OwnGlobals, ClientPairPermissions OwnPerms, 
         GlobalPermissions OtherGlobals, ClientPairPermissions OtherPerms, DateTime PairInitAt, string PairTempAccepter);

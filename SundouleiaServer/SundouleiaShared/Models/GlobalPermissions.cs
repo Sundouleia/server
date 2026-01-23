@@ -22,10 +22,8 @@ public class GlobalPermissions
 
     // Default Moodles related permissions when initializing a pair with someone.
     public MoodleAccess DefaultMoodleAccess     { get; set; } = MoodleAccess.None;
-
-    // If we should share limited/full moodles information (avoid full for now)
-    public bool         ShareOwnMoodles         { get; set; } = false;
-
+    public TimeSpan     DefaultMaxMoodleTime    { get; set; } = TimeSpan.Zero;
+    public bool         DefaultShareOwnMoodles  { get; set; } = false;
 
     // Other stuff that can be added later on..
 }

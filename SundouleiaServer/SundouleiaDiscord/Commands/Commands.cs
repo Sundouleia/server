@@ -254,6 +254,8 @@ public class SundouleiaCommands : InteractionModuleBase
             // Begin creating the user.
             using IServiceScope scope = _services.CreateScope();
             using SundouleiaDbContext? db = scope.ServiceProvider.GetService<SundouleiaDbContext>();
+            if (db is null)
+                throw new Exception("Database context is null");
 
             // Generate UID with specified suffix, ensure uniqueness.
             var user = new User() { LastLogin = DateTime.UtcNow };

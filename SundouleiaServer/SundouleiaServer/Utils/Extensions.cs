@@ -69,7 +69,8 @@ public static class Extensions
             DefaultAllowSounds = dbState.DefaultAllowSounds,
             DefaultAllowVfx = dbState.DefaultAllowVfx,
             DefaultMoodleAccess = dbState.DefaultMoodleAccess,
-            DefaultShareOwnMoodles = dbState.ShareOwnMoodles
+            DefaultMaxMoodleTime = dbState.DefaultMaxMoodleTime,
+            DefaultShareOwnMoodles = dbState.DefaultShareOwnMoodles
         };
 
     public static PairPerms ToApi(this ClientPairPermissions? dbState)
@@ -108,6 +109,9 @@ public static class Extensions
         current.DefaultAllowAnimations = api.DefaultAllowAnimations;
         current.DefaultAllowSounds = api.DefaultAllowSounds;
         current.DefaultAllowVfx = api.DefaultAllowVfx;
+        current.DefaultMoodleAccess = api.DefaultMoodleAccess;
+        current.DefaultMaxMoodleTime = api.DefaultMaxMoodleTime;
+        current.DefaultShareOwnMoodles = api.DefaultShareOwnMoodles;
     }
 
     public static void UpdateDbModel(this PairPerms api, ClientPairPermissions current)
@@ -119,6 +123,9 @@ public static class Extensions
         current.AllowAnimations = api.AllowAnimations;
         current.AllowSounds = api.AllowSounds;
         current.AllowVfx = api.AllowVfx;
+        current.MoodleAccess = api.MoodleAccess;
+        current.MaxMoodleTime = api.MaxMoodleTime;
+        current.ShareOwnMoodles = api.ShareOwnMoodles;
     }
 }
 #nullable disable

@@ -41,10 +41,11 @@ public partial class SundouleiaHub
     public Task Callback_IpcUpdateMods(IpcUpdateMods _) => throw new PlatformNotSupportedException(UnsupportedMessage);
     public Task Callback_IpcUpdateOther(IpcUpdateOther _) => throw new PlatformNotSupportedException(UnsupportedMessage);
     public Task Callback_IpcUpdateSingle(IpcUpdateSingle _) => throw new PlatformNotSupportedException(UnsupportedMessage);
-    public Task Callback_SingleChangeGlobal(SingleChangeGlobal _) => throw new PlatformNotSupportedException(UnsupportedMessage);
-    public Task Callback_BulkChangeGlobal(BulkChangeGlobal _) => throw new PlatformNotSupportedException(UnsupportedMessage);
-    public Task Callback_SingleChangeUnique(SingleChangeUnique _) => throw new PlatformNotSupportedException(UnsupportedMessage);
-    public Task Callback_BulkChangeUnique(BulkChangeUnique _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_ChangeGlobalPerm(ChangeGlobalPerm _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_ChangeAllGlobal(ChangeAllGlobal _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_ChangeUniquePerm(ChangeUniquePerm _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_ChangeUniquePerms(ChangeUniquePerms _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_ChangeAllUnique(ChangeAllUnique _) => throw new PlatformNotSupportedException(UnsupportedMessage);
 
     // --- Radar Callbacks ---
     public Task Callback_RadarAddUpdateUser(OnlineUser _) => throw new PlatformNotSupportedException(UnsupportedMessage);
