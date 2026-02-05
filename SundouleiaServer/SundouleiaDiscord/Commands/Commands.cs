@@ -232,11 +232,11 @@ public class SundouleiaCommands : InteractionModuleBase
     [SlashCommand("createuser", "ADMIN ONLY: Creates a user with a UID ending in the specified 4 characters.")]
     [RequireUserPermission(GuildPermission.Administrator)]
     public async Task CreateUserWithCustomUidSuffix(
-    [Summary("uid_suffix", "Last 4 characters of the UID (must be 4 chars)")] string uidSuffix)
+    [Summary("uid_suffix", "Either the last 4 characters of the UID (suffix mode), or the full 10-character UID")] string uidSuffix)
     {
-        if (uidSuffix.Length != 4)
+        if (uidSuffix.Length != 4 && uidSuffix.Length != 10)
         {
-            await RespondAsync("UID suffix must be exactly 4 characters.", ephemeral: true);
+            await RespondAsync("UID must be either **4 characters (suffix)** or **10 characters (full UID)**.", ephemeral: true);
             return;
         }
 
@@ -260,20 +260,30 @@ public class SundouleiaCommands : InteractionModuleBase
             // Generate UID with specified suffix, ensure uniqueness.
             var user = new User() { LastLogin = DateTime.UtcNow };
 
+            string finalUid;
+            bool isFullUid = uidSuffix.Length == 10;
+
             bool hasValidUid = false;
             while (!hasValidUid) // while its false, keep generating a new one.
             {
-                var prefix = StringUtils.GenerateRandomString(6);
-                var candidate = prefix + uidSuffix;
-                if (db.Users.Any(u => u.UID == candidate || u.Alias == candidate))
+                finalUid = isFullUid ? uidSuffix : StringUtils.GenerateRandomString(6) + uidSuffix;
+
+                if (db.Users.Any(u => u.UID == finalUid || u.Alias == finalUid))
+                {
+                    if (isFullUid)
+                        throw new InvalidOperationException($"The UID `{finalUid}` is already in use.");
+                    // Otherwise continue.
                     continue;
+                }
                 // Match was found, assign and break.
-                user.UID = candidate;
+                user.UID = finalUid;
                 hasValidUid = true;
             }
 
             // Modify the message to indicate user creation.
-            eb.WithTitle($"UserUID Assigned {user.UID}");
+            eb.WithTitle(isFullUid
+                ? $"Assigning Explicit UserUID {uidSuffix}..."
+                : $"Generating UserUID ending in {uidSuffix}...");
             eb.WithDescription($"Generating Auth & AccountRep entries.");
             await ModifyMessageAsync(eb, resp).ConfigureAwait(false);
 

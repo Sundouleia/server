@@ -26,8 +26,8 @@ internal partial class DiscordBot
         using SundouleiaDbContext dbContext = scope.ServiceProvider.GetRequiredService<SundouleiaDbContext>();
 
         // Define the required role ID for access to this command
-        ulong assistantRoleId = 884542694842597416; // Replace with your specific role ID
-        ulong mistressRoleId = 878511993068355604; // Replace with your specific role ID
+        ulong assistantRoleId = 1421010059760238603; // Replace with your specific role ID
+        ulong corbRoleId = 1421010059760238604; // Replace with your specific role ID
 
         // Get the user's ID and guild (server)
         ulong userId = arg.User.Id;
@@ -43,7 +43,7 @@ internal partial class DiscordBot
         SocketGuildUser guildUser = guild.GetUser(userId);
 
         // Check if the user has the required role
-        if (guildUser is null || !guildUser.Roles.Any(r => r.Id == assistantRoleId || r.Id == mistressRoleId))
+        if (guildUser is null || !guildUser.Roles.Any(r => r.Id == assistantRoleId || r.Id == corbRoleId))
         {
             EmbedBuilder eb = new();
             eb.WithTitle("Cannot resolve report");

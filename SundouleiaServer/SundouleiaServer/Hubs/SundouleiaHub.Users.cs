@@ -334,6 +334,7 @@ public partial class SundouleiaHub
             };
 
             DbContext.ClientPairs.AddRange(callerToTarget, targetToCaller);
+            await DbContext.SaveChangesAsync().ConfigureAwait(false);
 
             // Create perms (always new in bulk accept)
             var ownPerms = new ClientPairPermissions
@@ -416,6 +417,10 @@ public partial class SundouleiaHub
                 await Clients.User(senderUid).Callback_UserOnline(new(callerUser.ToUserData(), UserCharaIdent)).ConfigureAwait(false);
             }
         }
+
+        // Save the changes.
+        await DbContext.SaveChangesAsync().ConfigureAwait(false);
+
 
         // Update metrics and return.
         _metrics.IncCounter(MetricsAPI.CounterRequestsAccepted, requests.Count);

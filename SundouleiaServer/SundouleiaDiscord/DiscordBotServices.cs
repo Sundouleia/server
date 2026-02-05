@@ -109,13 +109,13 @@ public class DiscordBotServices
     public async Task ProcessReports(IUser discordUser, CancellationToken token)
     {
         // if the guild is null, log the warning that the guild is null and return
-        if (CkGuildCached is null)
+        if (SundouleiaGuildCached is null)
         {
             Logger.LogWarning("No Guild Cached");
             return;
         }
         // if user id is null, log the warning that the user id is null and return
-        Logger.LogInformation("Processing Reports Queue for Guild " + CkGuildCached.Name + 
+        Logger.LogInformation("Processing Reports Queue for Guild " + SundouleiaGuildCached.Name + 
             " from User: " + discordUser.GlobalName);
 
         // otherwise grab our channel report ID
@@ -126,7 +126,7 @@ public class DiscordBotServices
             return;
         }
 
-        var restChannel = await CkGuildCached.GetTextChannelAsync(reportChannelId.Value).ConfigureAwait(false);
+        var restChannel = await SundouleiaGuildCached.GetTextChannelAsync(reportChannelId.Value).ConfigureAwait(false);
         // Filter messages to only delete profile report messages sent by the bot
         var messages = await restChannel.GetMessagesAsync().FlattenAsync().ConfigureAwait(false);
         var profileReportMessages = messages.Where(m => m.Author.Id == discordUser.Id);
@@ -157,12 +157,12 @@ public class DiscordBotServices
 
                 // collect the list of profile reports otherwise and get the report channel
                 var reports = await dbContext.ProfileReports.ToListAsync().ConfigureAwait(false);
-                Logger.LogInformation("Found {count} Reports", reports.Count);
+                Logger.LogInformation($"Found {reports.Count} Reports");
 
                 // for each report, generate an embed and send it to the report channel
                 foreach (var report in reports)
                 {
-                    Logger.LogDebug("Displaying Report for {reportedUserUID} by {reportingUserUID}", report.ReportedUserUID, report.ReportingUserUID);
+                    Logger.LogDebug($"Displaying Report for {report.ReportedUserUID} by {report.ReportingUserUID}");
                     // get the user who reported
                     var reportedUser = await dbContext.Users.SingleAsync(u => u.UID == report.ReportedUserUID).ConfigureAwait(false);
                     var reportedUserAccountClaim = await dbContext.AccountClaimAuth.SingleOrDefaultAsync(u => u!.User!.UID == report.ReportedUserUID).ConfigureAwait(false);

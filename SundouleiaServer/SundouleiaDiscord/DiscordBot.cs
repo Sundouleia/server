@@ -170,8 +170,6 @@ internal partial class DiscordBot : IHostedService
         {
             await CreateOrUpdateModal(sundouleiaGuild).ConfigureAwait(false);
             _botServices.UpdateSundouleiaGuild(sundouleiaGuild);
-            // Init the reports queue.
-            _ = ProcessReportsQueue(sundouleiaGuild); // Canceled by its own token.
         }
 
         // If the ckGuild is not null, then we can process vanity perks by merging perks from CK & Sundouleia.
@@ -181,6 +179,8 @@ internal partial class DiscordBot : IHostedService
         _ = UpdateVanityRoles(sundouleiaGuild, ckGuild, _updateStatusCts.Token);
         _ = AddPerksToUsersWithVanityRole(sundouleiaGuild, ckGuild, _updateStatusCts.Token);
         _ = RemovePerksFromUsersNotInVanityRole(sundouleiaGuild, ckGuild, _updateStatusCts.Token);
+        // Init the reports queue.
+        _ = ProcessReportsQueue(sundouleiaGuild); // Canceled by its own token.
     }
 
     /// <summary>
