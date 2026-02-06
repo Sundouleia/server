@@ -2,7 +2,6 @@
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
-using SundouleiaAPI.Data;
 using SundouleiaAPI.Enums;
 using SundouleiaAPI.Hub;
 using SundouleiaAPI.Network;
@@ -10,7 +9,6 @@ using SundouleiaServer.Utils;
 using SundouleiaShared.Metrics;
 using SundouleiaShared.Models;
 using SundouleiaShared.Utils;
-using System.Reflection;
 
 namespace SundouleiaServer.Hubs;
 #nullable enable
@@ -56,8 +54,10 @@ public partial class SundouleiaHub
         {
             User = callerUser,
             OtherUser = target,
-            IsTemporary = dto.IsTemp,
-            AttachedMessage = dto.Message,
+            IsTemporary = dto.Details.IsTemp,
+            AttachedMessage = dto.Details.Message,
+            FromWorldId = dto.Details.FromWorldId,
+            FromZoneId = dto.Details.FromZoneId,
             CreationTime = DateTime.UtcNow,
         };
         await DbContext.Requests.AddAsync(newRequest).ConfigureAwait(false);

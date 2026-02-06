@@ -100,14 +100,14 @@ public partial class SundouleiaHub
             RoomNumber = dto.IsIndoor ? dto.RoomNumber : (byte)0,
 
             ReporterUID = UserUID,
-
             ReportReason = dto.ReportReason,
         };
+
         await DbContext.RadarReports.AddAsync(reportToAdd).ConfigureAwait(false);
         await DbContext.SaveChangesAsync().ConfigureAwait(false);
 
         // Inform the reporter that the report was successful.
-        await Clients.Caller.Callback_ServerMessage(MessageSeverity.Information, "Your Report was processed, and now pending validation from CK").ConfigureAwait(false);
+        await Clients.Caller.Callback_ServerMessage(MessageSeverity.Information, "Your Report was processed, and now pending validation from Sundouleia").ConfigureAwait(false);
 
         _metrics.IncCounter(MetricsAPI.CounterReportsCreatedRadar);
         return HubResponseBuilder.Yippee();

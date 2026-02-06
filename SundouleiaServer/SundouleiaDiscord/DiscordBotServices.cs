@@ -106,6 +106,9 @@ public class DiscordBotServices
         }
     }
 
+    /// <summary>
+    ///     Very messy, refactor later.
+    /// </summary>
     public async Task ProcessReports(IUser discordUser, CancellationToken token)
     {
         // if the guild is null, log the warning that the guild is null and return
@@ -115,8 +118,7 @@ public class DiscordBotServices
             return;
         }
         // if user id is null, log the warning that the user id is null and return
-        Logger.LogInformation("Processing Reports Queue for Guild " + SundouleiaGuildCached.Name + 
-            " from User: " + discordUser.GlobalName);
+        Logger.LogInformation($"Processing Reports Queue for Guild {SundouleiaGuildCached.Name} from User: {discordUser.GlobalName}");
 
         // otherwise grab our channel report ID
         var reportChannelId = _config.GetValue<ulong?>(nameof(DiscordConfig.ChannelForReports));
@@ -248,6 +250,63 @@ public class DiscordBotServices
                 }
 
                 await dbContext.SaveChangesAsync().ConfigureAwait(false);
+
+                // Now handle reports
+                var radarReports = await dbContext.RadarReports.ToListAsync().ConfigureAwait(false);
+                Logger.LogInformation($"Found {reports.Count} Reports");
+
+                // for each report, generate an embed and send it to the report channel
+                foreach (var radarReport in radarReports)
+                {
+                    Logger.LogDebug($"Displaying Report for {radarReport.ReportedUserUID} by {radarReport.ReporterUID}");
+                    // get the user who reported
+                    var reportedUser = await dbContext.Users.SingleAsync(u => u.UID == radarReport.ReportedUserUID).ConfigureAwait(false);
+                    var reportedUserAccountClaim = await dbContext.AccountClaimAuth.SingleOrDefaultAsync(u => u!.User!.UID == radarReport.ReportedUserUID).ConfigureAwait(false);
+
+                    // get the user who was reported
+                    var reportingUser = await dbContext.Users.SingleAsync(u => u.UID == radarReport.ReporterUID).ConfigureAwait(false);
+                    var reportingUserAccountClaim = await dbContext.AccountClaimAuth.SingleOrDefaultAsync(u => u!.User!.UID == radarReport.ReporterUID).ConfigureAwait(false);
+
+                    // get the profile data of the reported user.
+                    var reportedUserProfile = await dbContext.UserProfileData.SingleAsync(u => u.UserUID == radarReport.ReportedUserUID).ConfigureAwait(false);
+
+                    // create an embed post to display reported profiles.
+                    EmbedBuilder eb = new();
+                    eb.WithTitle("Sundouleia Radar Report");
+
+                    StringBuilder reportedUserSb = new();
+                    StringBuilder reportingUserSb = new();
+                    reportedUserSb.Append(reportedUser.UID);
+                    reportingUserSb.Append(reportingUser.UID);
+                    if (reportedUserAccountClaim != null)
+                    {
+                        reportedUserSb.AppendLine($" (<@{reportedUserAccountClaim.DiscordId}>)");
+                    }
+                    if (reportingUserAccountClaim != null)
+                    {
+                        reportingUserSb.AppendLine($" (<@{reportingUserAccountClaim.DiscordId}>)");
+                    }
+                    eb.AddField("Report Initiator", reportingUserSb.ToString());
+                    var reportTimeUtc = new DateTimeOffset(radarReport.ReportTime, TimeSpan.Zero);
+                    var formattedTimestamp = string.Create(CultureInfo.InvariantCulture, $"<t:{reportTimeUtc.ToUnixTimeSeconds()}:F>");
+                    eb.AddField("Report Time (Local)", formattedTimestamp);
+                    eb.AddField("Report Reason", string.IsNullOrWhiteSpace(radarReport.ReportReason) ? "-" : radarReport.ReportReason);
+                    eb.AddField("Reported User", reportedUserSb.ToString());
+
+                    var cb = new ComponentBuilder();
+                    // For now report results will affect the user universally, we will need to manually decide on bans until this is refactored.
+                    cb.WithButton("Dismiss Report", customId: $"sundouleia-report-button-dismissreport-{reportedUser.UID}", style: ButtonStyle.Primary);
+                    cb.WithButton("Clear Profile", customId: $"sundouleia-report-button-clearprofileimage-{reportedUser.UID}", style: ButtonStyle.Secondary);
+                    cb.WithButton("Revoke Social Features", customId: $"sundouleia-report-button-revokesocialfeatures-{reportedUser.UID}", style: ButtonStyle.Secondary);
+                    cb.WithButton("Ban User", customId: $"sundouleia-report-button-banuser-{reportedUser.UID}", style: ButtonStyle.Danger);
+                    cb.WithButton("Dismiss & Flag Reporting User", customId: $"sundouleia-report-button-flagreporter-{reportedUser.UID}-{reportingUser.UID}", style: ButtonStyle.Danger);
+
+                    // If no attachments, send the message with only the embed and components
+                    await restChannel.SendMessageAsync(embed: eb.Build(), components: cb.Build()).ConfigureAwait(false);
+                }
+
+                await dbContext.SaveChangesAsync().ConfigureAwait(false);
+
             }
         }
         catch (Exception ex)
