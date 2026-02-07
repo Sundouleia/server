@@ -258,7 +258,11 @@ public class SundouleiaCommands : InteractionModuleBase
                 throw new Exception("Database context is null");
 
             // Generate UID with specified suffix, ensure uniqueness.
-            var user = new User() { LastLogin = DateTime.UtcNow };
+            var user = new User()
+            {
+                LastLogin = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow,
+            };
 
             string finalUid;
             bool isFullUid = uidSuffix.Length == 10;
