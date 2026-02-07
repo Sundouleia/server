@@ -75,6 +75,60 @@ public partial class SundouleiaHub
         return HubResponseBuilder.Yippee(callbackDto);
     }
 
+    [Authorize(Policy = "Identified")]
+    public async Task<HubResponse<List<SundesmoRequest>>> UserSendRequests(CreateRequests dto)
+    {
+        _logger.LogCallInfo(SundouleiaHubLogger.Args(dto));
+        var targetUids = dto.Recipients.Select(u => u.UID.Trim()).ToList();
+        if (targetUids.Count == 0)
+            return HubResponseBuilder.AwDangIt<List<SundesmoRequest>>(SundouleiaApiEc.NullData);
+
+        // Collect the trimmed, valid UIDs.
+        var validTargets = await GetRequestableUsers(targetUids).ConfigureAwait(false);
+        if (validTargets.Count == 0)
+            return HubResponseBuilder.AwDangIt<List<SundesmoRequest>>(SundouleiaApiEc.NullData);
+
+        // Grab the caller user
+        var callerUser = await DbContext.Users.SingleAsync(u => u.UID == UserUID).ConfigureAwait(false);
+
+        // Perform the creation for each of our requests, then add them in bulk and inform the recipients.
+        var createdRequests = new List<PairRequest>();
+        var callbackApis = new List<SundesmoRequest>();
+        foreach (var user in validTargets)
+        {
+            // Create and add the request to the DB, and save changes.
+            var newRequest = new PairRequest()
+            {
+                User = callerUser,
+                OtherUser = user,
+                IsTemporary = dto.Details.IsTemp,
+                AttachedMessage = dto.Details.Message,
+                FromWorldId = dto.Details.FromWorldId,
+                FromZoneId = dto.Details.FromZoneId,
+                CreationTime = DateTime.UtcNow,
+            };
+            createdRequests.Add(newRequest);
+            // If DbContext gets picky we can add this, but less calls is faster...
+            // await DbContext.Requests.AddAsync(newRequest).ConfigureAwait(false);
+
+            // Need to make a DTO version of this that is sent back.
+            var callbackDto = newRequest.ToApi();
+            callbackApis.Add(callbackDto);
+
+            // If the target user's UID is in the redis DB, send them the pending request.
+            if (await GetUserIdent(user.UID).ConfigureAwait(false) is not null)
+                await Clients.User(user.UID).Callback_AddRequest(callbackDto).ConfigureAwait(false);
+        }
+
+        // Add the requests and save.
+        await DbContext.AddRangeAsync(createdRequests).ConfigureAwait(false);
+        await DbContext.SaveChangesAsync().ConfigureAwait(false);
+
+        _metrics.IncCounter(MetricsAPI.CounterRequestsCreated, validTargets.Count);
+        _metrics.IncGauge(MetricsAPI.GaugeRequestsPending, validTargets.Count);
+        return HubResponseBuilder.Yippee(createdRequests.Select(r => r.ToApi()).ToList());
+    }
+    
     /// <summary>
     ///     If either the creator of a of the request cancels the request prior to its expiration time. <para />
     ///     Monitor this callback, if it returns successful, the caller should remove the request they wished to cancel.
@@ -155,7 +209,7 @@ public partial class SundouleiaHub
     ///     <b>If caller receives "AlreadyPaired", they should remove the request from their list.</b>
     /// </summary>
     [Authorize(Policy = "Identified")]
-    public async Task<HubResponse<AddedUserPair>> UserAcceptRequest(UserDto dto)
+    public async Task<HubResponse<AddedUserPair>> UserAcceptRequest(RequestResponse dto)
     {
         _logger.LogCallInfo(SundouleiaHubLogger.Args(dto));
         var uid = dto.User.UID.Trim();
@@ -170,9 +224,7 @@ public partial class SundouleiaHub
 
         // Ensure that the request does not already exist in the database.
         if (await DbContext.Requests.SingleOrDefaultAsync(k => k.UserUID == target.UID && k.OtherUserUID == UserUID).ConfigureAwait(false) is not { } request)
-            return HubResponseBuilder.AwDangIt<AddedUserPair>(SundouleiaApiEc.RequestNotFound);
-
-        var wasTempRequest = request.IsTemporary;
+            return HubResponseBuilder.AwDangIt<AddedUserPair>(SundouleiaApiEc.RequestNotFound);        
 
         // Must not be already paired. If you are, discard the request regardless, but return with error. 
         if (await DbContext.ClientPairs.AnyAsync(p => (p.UserUID == UserUID && p.OtherUserUID == target.UID) || (p.UserUID == target.UID && p.OtherUserUID == UserUID)).ConfigureAwait(false))
@@ -189,14 +241,14 @@ public partial class SundouleiaHub
             User = callerUser,
             OtherUser = target,
             CreatedAt = DateTime.UtcNow,
-            TempAccepterUID = wasTempRequest ? callerUser.UID : string.Empty,
+            TempAccepterUID = dto.AsTemp ? callerUser.UID : string.Empty,
         };
         var recipientToCaller = new ClientPair()
         {
             User = target,
             OtherUser = callerUser,
             CreatedAt = DateTime.UtcNow,
-            TempAccepterUID = wasTempRequest ? callerUser.UID : string.Empty,
+            TempAccepterUID = dto.AsTemp ? callerUser.UID : string.Empty,
         };
         // Add them to the DB.
         await DbContext.ClientPairs.AddAsync(callerToRecipient).ConfigureAwait(false);
@@ -288,10 +340,10 @@ public partial class SundouleiaHub
     }
 
     [Authorize(Policy = "Identified")]
-    public async Task<HubResponse<List<AddedUserPair>>> UserAcceptRequests(UserListDto toAccept)
+    public async Task<HubResponse<List<AddedUserPair>>> UserAcceptRequests(RequestResponses toAccept)
     {
         _logger.LogCallInfo(SundouleiaHubLogger.Args(toAccept));
-        var senderUids = toAccept.Users.Select(u => u.UID.Trim()).ToList();
+        var senderUids = toAccept.Responces.Select(u => u.User.UID.Trim()).ToList();
         senderUids.Remove(UserUID); // Pre-fire removing self
 
         if (senderUids.Count == 0)
@@ -314,7 +366,7 @@ public partial class SundouleiaHub
         foreach (var (senderUid, info) in requests)
         {
             var request = info.Request;
-            var wasTemp = request.IsTemporary;
+            var acceptAsTemp = toAccept.Responces.Single(r => string.Equals(r.User.UID, senderUid, StringComparison.OrdinalIgnoreCase)).AsTemp;
 
             // Create pairs
             var callerToTarget = new ClientPair
@@ -322,7 +374,7 @@ public partial class SundouleiaHub
                 User = callerUser,
                 OtherUser = info.Sender,
                 CreatedAt = now,
-                TempAccepterUID = wasTemp ? UserUID : string.Empty
+                TempAccepterUID = acceptAsTemp ? UserUID : string.Empty
             };
 
             var targetToCaller = new ClientPair
@@ -330,7 +382,7 @@ public partial class SundouleiaHub
                 User = info.Sender,
                 OtherUser = callerUser,
                 CreatedAt = now,
-                TempAccepterUID = wasTemp ? UserUID : string.Empty
+                TempAccepterUID = acceptAsTemp ? UserUID : string.Empty
             };
 
             DbContext.ClientPairs.AddRange(callerToTarget, targetToCaller);
@@ -373,7 +425,7 @@ public partial class SundouleiaHub
                 info.SenderGlobals.ToApi(),
                 otherPerms.ToApi(),
                 DateTime.UtcNow,
-                wasTemp ? UserUID : string.Empty
+                acceptAsTemp ? UserUID : string.Empty
             );
 
             // Inform other if online.
@@ -388,7 +440,7 @@ public partial class SundouleiaHub
                     info.RecipientGlobals.ToApi(),
                     ownPerms.ToApi(),
                     DateTime.UtcNow,
-                    wasTemp ? UserUID : string.Empty
+                    acceptAsTemp ? UserUID : string.Empty
                 );
                 await Clients.User(senderUid).Callback_RemoveRequest(Extensions.ToApiRemoval(new(senderUid), new(UserUID))).ConfigureAwait(false);
                 await Clients.User(senderUid).Callback_AddPair(senderRetDto).ConfigureAwait(false);
@@ -410,7 +462,7 @@ public partial class SundouleiaHub
                     info.RecipientGlobals.ToApi(),
                     ownPerms.ToApi(),
                     DateTime.UtcNow,
-                    wasTemp ? UserUID : string.Empty
+                    acceptAsTemp ? UserUID : string.Empty
                 );
                 await Clients.User(senderUid).Callback_RemoveRequest(Extensions.ToApiRemoval(new(senderUid), new(UserUID))).ConfigureAwait(false);
                 await Clients.User(senderUid).Callback_AddPair(requesterRetDto).ConfigureAwait(false);

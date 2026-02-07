@@ -270,6 +270,26 @@ public partial class SundouleiaHub
             x => new RequestInfo(x.Request, x.Sender, x.SenderGlobals, x.TargetGlobals), StringComparer.Ordinal);
     }
 
+    private async Task<List<User>> GetRequestableUsers(IEnumerable<string> userUids)
+    {
+        // convert to hashset for quick matching.
+        var targets = userUids.ToHashSet(StringComparer.Ordinal);
+        if (targets.Count is 0)
+            return [];
+
+        var query = from u in DbContext.Users.AsNoTracking()
+                    where targets.Contains(u.UID)
+                    // Deny if blocked
+                    where !DbContext.BlockedUsers.AsNoTracking().Any(b => (b.UserUID == UserUID && b.OtherUserUID == u.UID) || (b.UserUID == u.UID && b.OtherUserUID == UserUID))
+                    // Deny if exists
+                    where !DbContext.Requests.AsNoTracking().Any(r => (r.UserUID == UserUID && r.OtherUserUID == u.UID) || (r.UserUID == u.UID && r.OtherUserUID == UserUID))
+                    // Deny if paired
+                    where !DbContext.ClientPairs.AsNoTracking().Any(p => (p.UserUID == UserUID && p.OtherUserUID == u.UID) || (p.UserUID == u.UID && p.OtherUserUID == UserUID))
+                    select u;
+        // ret the query result as a list.
+        return await query.ToListAsync().ConfigureAwait(false);
+    }
+
 
     private async Task<Dictionary<string, PairRequest>> GetSentRequests(IEnumerable<string> uids)
     {
