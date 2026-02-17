@@ -61,8 +61,6 @@ public partial class AccountWizard
 
         // display the user's set Alias if they have one
         eb.AddField("Vanity UID", dbUser?.Alias ?? "No Vanity UID Set");
-        eb.AddField("Secret Key", dbUserAuth?.HashedKey ?? "No Secret Key");
-
         // Last login UTC & Last login Local
         var lastOnlineUtc = new DateTimeOffset(dbUser.LastLogin, TimeSpan.Zero);
         eb.AddField("Last Online (UTC)", lastOnlineUtc.ToString("u", CultureInfo.InvariantCulture));

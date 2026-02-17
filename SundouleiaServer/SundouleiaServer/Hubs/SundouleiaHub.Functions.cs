@@ -263,7 +263,7 @@ public partial class SundouleiaHub
                         TargetGlobals = targetGlobals
                     };
 
-        var infoResult = await info.AsNoTracking().ToListAsync().ConfigureAwait(false);
+        var infoResult = await info.ToListAsync().ConfigureAwait(false);
 
         // Might need to reformat to work more like below.
         return infoResult.ToDictionary(x => x.TargetUid, 
@@ -278,7 +278,7 @@ public partial class SundouleiaHub
             return [];
 
         var query = from u in DbContext.Users.AsNoTracking()
-                    where targets.Contains(u.UID)
+                    where targets.Contains(u.UID) || targets.Contains(u.Alias)
                     // Deny if blocked
                     where !DbContext.BlockedUsers.AsNoTracking().Any(b => (b.UserUID == UserUID && b.OtherUserUID == u.UID) || (b.UserUID == u.UID && b.OtherUserUID == UserUID))
                     // Deny if exists

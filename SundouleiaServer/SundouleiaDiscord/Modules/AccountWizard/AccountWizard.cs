@@ -19,6 +19,7 @@ public partial class AccountWizard : InteractionModuleBase
 {
     private ILogger<AccountWizard> _logger;
     private IServiceProvider _services;
+    private ServerTokenGenerator _tokenGen;
     private DiscordBotServices _botServices;
     private IConfigurationService<ServerConfig> _serverConfig;
     private IConfigurationService<DiscordConfig> _discordConfig;
@@ -26,11 +27,18 @@ public partial class AccountWizard : InteractionModuleBase
     private IDbContextFactory<SundouleiaDbContext> _dbContextFactory;
     private Random random = new();
 
-    public AccountWizard(ILogger<AccountWizard> logger, IServiceProvider services, DiscordBotServices botServices,
-        IConfigurationService<ServerConfig> serverConfig, IConfigurationService<DiscordConfig> discordConfig, 
-        IConnectionMultiplexer multiplexer, IDbContextFactory<SundouleiaDbContext> dbContextFactory)
+    public AccountWizard(
+        ILogger<AccountWizard> logger,
+        IServiceProvider services,
+        ServerTokenGenerator tokenGen,
+        DiscordBotServices botServices,
+        IConfigurationService<ServerConfig> serverConfig, 
+        IConfigurationService<DiscordConfig> discordConfig, 
+        IConnectionMultiplexer multiplexer,
+        IDbContextFactory<SundouleiaDbContext> dbContextFactory)
     {
         _logger = logger;
+        _tokenGen = tokenGen;
         _services = services;
         _botServices = botServices;
         _serverConfig = serverConfig;

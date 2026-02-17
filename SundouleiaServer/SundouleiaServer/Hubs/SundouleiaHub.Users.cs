@@ -27,7 +27,7 @@ public partial class SundouleiaHub
             return HubResponseBuilder.AwDangIt<SundesmoRequest>(SundouleiaApiEc.InvalidRecipient);
 
         // Prevent sending to a user not registered in Sundouleia.
-        if (await DbContext.Users.SingleOrDefaultAsync(u => u.UID == uid).ConfigureAwait(false) is not { } target)
+        if (await DbContext.Users.SingleOrDefaultAsync(u => u.UID == uid || u.Alias == uid).ConfigureAwait(false) is not { } target)
         {
             await Clients.Caller.Callback_ServerMessage(MessageSeverity.Warning, $"Cannot send Request to {dto.User.UID}, they don't exist").ConfigureAwait(false);
             return HubResponseBuilder.AwDangIt<SundesmoRequest>(SundouleiaApiEc.InvalidRecipient);
@@ -67,8 +67,8 @@ public partial class SundouleiaHub
         var callbackDto = newRequest.ToApi();
 
         // If the target user's UID is in the redis DB, send them the pending request.
-        if (await GetUserIdent(uid).ConfigureAwait(false) is not null)
-            await Clients.User(uid).Callback_AddRequest(callbackDto).ConfigureAwait(false);
+        if (await GetUserIdent(target.UID).ConfigureAwait(false) is not null)
+            await Clients.User(target.UID).Callback_AddRequest(callbackDto).ConfigureAwait(false);
 
         _metrics.IncCounter(MetricsAPI.CounterRequestsCreated);
         _metrics.IncGauge(MetricsAPI.GaugeRequestsPending);
@@ -145,7 +145,7 @@ public partial class SundouleiaHub
             return HubResponseBuilder.AwDangIt(SundouleiaApiEc.InvalidRecipient);
 
         // Prevent sending to a user not registered in Sundouleia.
-        if (await DbContext.Users.SingleOrDefaultAsync(u => u.UID == uid).ConfigureAwait(false) is not { } target)
+        if (await DbContext.Users.SingleOrDefaultAsync(u => u.UID == uid || u.Alias == uid).ConfigureAwait(false) is not { } target)
             return HubResponseBuilder.AwDangIt(SundouleiaApiEc.InvalidRecipient);
 
         // Ensure that the request does not already exist in the database.
@@ -155,11 +155,11 @@ public partial class SundouleiaHub
         // Can cancel the request:
         var callerUser = await DbContext.Users.SingleAsync(u => u.UID == UserUID).ConfigureAwait(false);
         // Create the dummy callback for removal.
-        var callbackDto = Extensions.ToApiRemoval(new(UserUID), new(uid));
+        var callbackDto = Extensions.ToApiRemoval(new(UserUID), new(target.UID));
         
         // send off to the other user if they are online.
-        if (await GetUserIdent(uid).ConfigureAwait(false) is { } otherIdent) 
-            await Clients.User(uid).Callback_RemoveRequest(callbackDto).ConfigureAwait(false);
+        if (await GetUserIdent(target.UID).ConfigureAwait(false) is { } otherIdent) 
+            await Clients.User(target.UID).Callback_RemoveRequest(callbackDto).ConfigureAwait(false);
 
         // remove request from db and return.
         DbContext.Requests.Remove(request);
@@ -219,7 +219,7 @@ public partial class SundouleiaHub
             return HubResponseBuilder.AwDangIt<AddedUserPair>(SundouleiaApiEc.CannotInteractWithSelf);
 
         // Prevent sending to a user not registered in Sundouleia.
-        if (await DbContext.Users.SingleOrDefaultAsync(u => u.UID == uid).ConfigureAwait(false) is not { } target)
+        if (await DbContext.Users.SingleOrDefaultAsync(u => u.UID == uid || u.Alias == uid).ConfigureAwait(false) is not { } target)
             return HubResponseBuilder.AwDangIt<AddedUserPair>(SundouleiaApiEc.NullData);
 
         // Ensure that the request does not already exist in the database.
@@ -312,7 +312,7 @@ public partial class SundouleiaHub
         );
 
         // Get if the request creator is online of not.
-        var requesterIdentity = await GetUserIdent(uid).ConfigureAwait(false);
+        var requesterIdentity = await GetUserIdent(target.UID).ConfigureAwait(false);
 
         // If the request creator is online, send them the remove request and add pair callbacks, and also return sendOnline to both.
         if (requesterIdentity is not null)
@@ -325,9 +325,9 @@ public partial class SundouleiaHub
                 existingData.PairInitAt,
                 existingData.PairTempAccepter
             );
-            await Clients.User(uid).Callback_RemoveRequest(Extensions.ToApiRemoval(new(uid), new(UserUID))).ConfigureAwait(false);
-            await Clients.User(uid).Callback_AddPair(requesterRetDto).ConfigureAwait(false);
-            await Clients.User(uid).Callback_UserOnline(new(callerUser.ToUserData(), UserCharaIdent)).ConfigureAwait(false);
+            await Clients.User(target.UID).Callback_RemoveRequest(Extensions.ToApiRemoval(new(uid), new(UserUID))).ConfigureAwait(false);
+            await Clients.User(target.UID).Callback_AddPair(requesterRetDto).ConfigureAwait(false);
+            await Clients.User(target.UID).Callback_UserOnline(new(callerUser.ToUserData(), UserCharaIdent)).ConfigureAwait(false);
         }
 
         // Inc the metrics and then return result.
@@ -371,28 +371,27 @@ public partial class SundouleiaHub
             // Create pairs
             var callerToTarget = new ClientPair
             {
-                User = callerUser,
-                OtherUser = info.Sender,
+                UserUID = callerUser.UID,
+                OtherUserUID = info.Sender.UID,
                 CreatedAt = now,
                 TempAccepterUID = acceptAsTemp ? UserUID : string.Empty
             };
 
             var targetToCaller = new ClientPair
             {
-                User = info.Sender,
-                OtherUser = callerUser,
+                UserUID = info.Sender.UID,
+                OtherUserUID = callerUser.UID,
                 CreatedAt = now,
                 TempAccepterUID = acceptAsTemp ? UserUID : string.Empty
             };
 
             DbContext.ClientPairs.AddRange(callerToTarget, targetToCaller);
-            await DbContext.SaveChangesAsync().ConfigureAwait(false);
 
             // Create perms (always new in bulk accept)
             var ownPerms = new ClientPairPermissions
             {
-                User = callerUser,
-                OtherUser = info.Sender,
+                UserUID = callerUser.UID,
+                OtherUserUID = info.Sender.UID,
                 PauseVisuals = false,
                 AllowAnimations = info.RecipientGlobals.DefaultAllowAnimations,
                 AllowSounds = info.RecipientGlobals.DefaultAllowSounds,
@@ -404,8 +403,8 @@ public partial class SundouleiaHub
 
             var otherPerms = new ClientPairPermissions
             {
-                User = info.Sender,
-                OtherUser = callerUser,
+                UserUID = info.Sender.UID,
+                OtherUserUID = callerUser.UID,
                 PauseVisuals = false,
                 AllowAnimations = info.SenderGlobals.DefaultAllowAnimations,
                 AllowSounds = info.SenderGlobals.DefaultAllowSounds,
@@ -420,7 +419,7 @@ public partial class SundouleiaHub
 
             // Build return DTO (caller perspective)
             var callerRetDto = new UserPair(
-                request.User!.ToUserData(),
+                info.Sender.ToUserData(),
                 ownPerms.ToApi(),
                 info.SenderGlobals.ToApi(),
                 otherPerms.ToApi(),

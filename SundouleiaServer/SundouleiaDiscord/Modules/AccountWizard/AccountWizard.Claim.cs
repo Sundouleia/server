@@ -4,8 +4,11 @@ using Microsoft.EntityFrameworkCore;
 using SundouleiaAPI.Enums;
 using SundouleiaDiscord.Modules.Popups;
 using SundouleiaShared.Data;
+using SundouleiaShared.Utils;
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using DiscordConfig = SundouleiaShared.Utils.Configuration.DiscordConfig;
 
 namespace SundouleiaDiscord.Modules.AccountWizard;
@@ -336,7 +339,24 @@ public partial class AccountWizard
         // await for the database to save changes
         await dbContext.SaveChangesAsync().ConfigureAwait(false);
 
+        // Reconnect them automatically, if possible.
+        try
+        {
+            using HttpClient client = new HttpClient();
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _tokenGen.Token);
 
+            // Only force reconnect this individual
+            HardReconnectMessage payload = new HardReconnectMessage(MessageSeverity.Information, "Force Reconnecting", ServerState.ForcedReconnect, user.UID);
+            string jsonPayload = JsonSerializer.Serialize(payload);
+            _logger.LogInformation("Sending message to {uri} with payload: {jsonPayload}",
+                new Uri(_discordConfig.GetValue<Uri>(nameof(DiscordConfig.MainServerAddress)), "/msgc/forceHardReconnect"), jsonPayload);
+
+            using HttpResponseMessage response = await client.PostAsJsonAsync(new Uri(_discordConfig.GetValue<Uri>(nameof(DiscordConfig.MainServerAddress)), "/msgc/forceHardReconnect"), payload).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Failed to force reconnect {user.UID} after successful verification. User may need to manually reconnect. [{ex}]");
+        }
         // return success with the user's UID
         return (true, user.UID, initialKey);
     }
