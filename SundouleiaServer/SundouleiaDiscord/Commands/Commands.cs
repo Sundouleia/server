@@ -91,30 +91,6 @@ public class SundouleiaCommands : InteractionModuleBase
         }
     }
 
-
-    // admin only process reports poll queue.
-    [SlashCommand("fetchreports", "Manually process the reports queue and reset the timer.")]
-    [RequireUserPermission(GuildPermission.Administrator)]
-    public async Task ProcessReports()
-    {
-        try
-        {
-            _logger.LogInformation("Processing Reports Queue! " + Context.Guild.Name);
-            // Create a new CTS for the manual process
-            using (CancellationTokenSource manualCts = new CancellationTokenSource())
-            {
-                // Call the process reports queue with the manual token
-                await _botServices.ProcessReports(Context.User, manualCts.Token);
-            }
-            await RespondAsync("Reports queue processed and timer reset.", ephemeral: true);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to process reports queue");
-            await RespondAsync("Failed to process reports queue: " + ex.ToString(), ephemeral: true);
-        }
-    }
-
     // admin only command for sending a message to clients connected to the sundouleia service.
     [SlashCommand("message", "ADMIN ONLY: sends a message to clients")]
     [RequireUserPermission(GuildPermission.Administrator)]
@@ -503,46 +479,33 @@ public class SundouleiaCommands : InteractionModuleBase
         using SundouleiaDbContext? db = scope.ServiceProvider.GetService<SundouleiaDbContext>();
 
         // locate the auth first, as it is linked to registered and unregistered players.
-        Auth? auth = await db.Auth.Include(u => u.User).SingleOrDefaultAsync(u => u.User.UID == desiredUid).ConfigureAwait(false);
-        if (auth is null)
+        if (await db.Auth.Include(a => a.AccountRep).Include(a => a.User).SingleOrDefaultAsync(a => a.User.UID == desiredUid).ConfigureAwait(false) is not { } auth)
         {
             // The embed message is updated to indicate that the user already exists in the database
             embed.WithTitle("Failed to add user");
             embed.WithDescription("Already in Database");
             return embed.Build();
-
         }
 
-        // grab the banned user associated with this.
-        Banned? bannedUser = await db.BannedUsers.SingleOrDefaultAsync(u => u.UserUID == auth.UserUID).ConfigureAwait(false);
-        if(bannedUser is not null)
-        {
-            // remove the banned user from the database
-            db.BannedUsers.Remove(bannedUser);
-        }
+        auth.AccountRep.IsBanned = false;
 
-        // grab the account auth claim, if one exists.
-        AccountClaimAuth? accountClaim = await db.AccountClaimAuth.SingleOrDefaultAsync(u => u.User.UID == auth.UserUID).ConfigureAwait(false);
-        // if it exists, we should also grab the banned registration row, then delete both of these.
-        if(accountClaim is not null)
+        // Grab the banned user associated with this UID
+        if (await db.BannedUsers.SingleOrDefaultAsync(u => u.UserUID == desiredUid).ConfigureAwait(false) is { } bannedEntry)
+            db.BannedUsers.Remove(bannedEntry);
+
+        // Remove the banned registration if it exists
+        if (await db.AccountClaimAuth.SingleOrDefaultAsync(u => u.User.UID == auth.UserUID).ConfigureAwait(false) is { } claimAuth)
         {
-            BannedRegistrations? bannedRegistration = await db.BannedRegistrations.SingleOrDefaultAsync(u => u.DiscordId == accountClaim.DiscordId.ToString()).ConfigureAwait(false);
-            if(bannedRegistration is not null)
-            {
+            if (await db.BannedRegistrations.SingleOrDefaultAsync(u => u.DiscordId == claimAuth.DiscordId.ToString()).ConfigureAwait(false) is { } bannedRegistration)
                 db.BannedRegistrations.Remove(bannedRegistration);
-            }
         }
 
-        // update the disabled to false.
-        UserProfileData? profile = await db.UserProfileData.SingleOrDefaultAsync(u => u.UserUID == auth.UserUID).ConfigureAwait(false);
-        if (profile is not null)
+        // Modify the profile data.
+        if (await db.UserProfileData.SingleAsync(u => u.UserUID == auth.UserUID).ConfigureAwait(false) is { } profile)
         {
-            profile.IsDisabled = false;
+            profile.FlaggedForReport = false;
             profile.Description = string.Empty;
         }
-
-        var reputation = await db.AccountReputation.SingleOrDefaultAsync(u => u.UserUID == auth.PrimaryUserUID).ConfigureAwait(false);
-        reputation.IsBanned = false;
 
         // update all tables and save changes.
         await db.SaveChangesAsync();

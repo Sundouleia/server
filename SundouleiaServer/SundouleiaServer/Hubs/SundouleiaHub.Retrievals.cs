@@ -88,17 +88,12 @@ public partial class SundouleiaHub
                 return new FullProfileData(user.User, content with { Description = "Profile Pic is hidden as they have not allowed public plates!" }, string.Empty);
         }
 
-        // If the profile is disabled by moderation, return that it is disabled.
-        if (profile.IsDisabled)
-            return new FullProfileData(user.User, content with { Description = "This profile is disabled" }, string.Empty);
-
         if (profile.FlaggedForReport)
             return new FullProfileData(user.User, content with { Description = "Profile is pending review from Sundouleia after being reported" }, string.Empty);
 
+        // Ensure NSFW profiles are not returned if caller doesnt want to see them. 
         if (profile.IsNSFW && !allowNSFW)
             return new FullProfileData(user.User, content, string.Empty);
-        // If NSFW 
-
 
         return new FullProfileData(user.User, content, profile.Base64AvatarData);
     }

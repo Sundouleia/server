@@ -271,9 +271,9 @@ public partial class SundouleiaHub
                 AllowAnimations = existingData!.OwnGlobals.DefaultAllowAnimations,
                 AllowSounds = existingData!.OwnGlobals.DefaultAllowSounds,
                 AllowVfx = existingData!.OwnGlobals.DefaultAllowVfx,
-                MoodleAccess = existingData!.OwnGlobals.DefaultMoodleAccess,
-                MaxMoodleTime = TimeSpan.Zero,
-                ShareOwnMoodles = existingData!.OwnGlobals.DefaultShareOwnMoodles,
+                LociAccess = existingData!.OwnGlobals.DefaultLociAccess,
+                MaxLociTime = existingData?.OwnGlobals.DefaultMaxLociTime ?? TimeSpan.Zero,
+                ShareOwnLociData = existingData!.OwnGlobals.DefaultShareOwnLociData,
             };
             await DbContext.ClientPairPerms.AddAsync(newOwnPerms).ConfigureAwait(false);
         }
@@ -289,9 +289,9 @@ public partial class SundouleiaHub
                 AllowAnimations = existingData!.OtherGlobals.DefaultAllowAnimations,
                 AllowSounds = existingData!.OtherGlobals.DefaultAllowSounds,
                 AllowVfx = existingData!.OtherGlobals.DefaultAllowVfx,
-                MoodleAccess = existingData!.OtherGlobals.DefaultMoodleAccess,
-                MaxMoodleTime = TimeSpan.Zero,
-                ShareOwnMoodles = existingData!.OtherGlobals.DefaultShareOwnMoodles,
+                LociAccess = existingData!.OtherGlobals.DefaultLociAccess,
+                MaxLociTime = existingData?.OtherGlobals.DefaultMaxLociTime ?? TimeSpan.Zero,
+                ShareOwnLociData = existingData!.OtherGlobals.DefaultShareOwnLociData,
             };
             await DbContext.ClientPairPerms.AddAsync(newOtherPerms).ConfigureAwait(false);
         }
@@ -396,9 +396,9 @@ public partial class SundouleiaHub
                 AllowAnimations = info.RecipientGlobals.DefaultAllowAnimations,
                 AllowSounds = info.RecipientGlobals.DefaultAllowSounds,
                 AllowVfx = info.RecipientGlobals.DefaultAllowVfx,
-                MoodleAccess = info.RecipientGlobals.DefaultMoodleAccess,
-                MaxMoodleTime = info.RecipientGlobals.DefaultMaxMoodleTime,
-                ShareOwnMoodles = info.RecipientGlobals.DefaultShareOwnMoodles,
+                LociAccess = info.RecipientGlobals.DefaultLociAccess,
+                MaxLociTime = info.RecipientGlobals.DefaultMaxLociTime,
+                ShareOwnLociData = info.RecipientGlobals.DefaultShareOwnLociData,
             };
 
             var otherPerms = new ClientPairPermissions
@@ -409,9 +409,9 @@ public partial class SundouleiaHub
                 AllowAnimations = info.SenderGlobals.DefaultAllowAnimations,
                 AllowSounds = info.SenderGlobals.DefaultAllowSounds,
                 AllowVfx = info.SenderGlobals.DefaultAllowVfx,
-                MoodleAccess = info.SenderGlobals.DefaultMoodleAccess,
-                MaxMoodleTime = info.SenderGlobals.DefaultMaxMoodleTime,
-                ShareOwnMoodles = info.SenderGlobals.DefaultShareOwnMoodles,
+                LociAccess = info.SenderGlobals.DefaultLociAccess,
+                MaxLociTime = info.SenderGlobals.DefaultMaxLociTime,
+                ShareOwnLociData = info.SenderGlobals.DefaultShareOwnLociData,
             };
 
             DbContext.ClientPairPerms.AddRange(ownPerms, otherPerms);

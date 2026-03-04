@@ -46,9 +46,9 @@ public class SundouleiaBaseConfigController : SundouleiaConfigController<Sundoul
 /// <summary>
 ///     Config Controller for the server.
 /// </summary>
-public class SundouleiaServerConfigController : SundouleiaConfigController<ServerConfig>
+public class SundouleiaServerConfigController : SundouleiaConfigController<ServerConfiguration>
 {
-    public SundouleiaServerConfigController(IOptionsMonitor<ServerConfig> config, ILogger<SundouleiaServerConfigController> logger)
+    public SundouleiaServerConfigController(IOptionsMonitor<ServerConfiguration> config, ILogger<SundouleiaServerConfigController> logger)
         : base(config, logger)
     { }
 }

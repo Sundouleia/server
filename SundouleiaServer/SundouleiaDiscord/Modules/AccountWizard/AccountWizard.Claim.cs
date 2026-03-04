@@ -1,7 +1,9 @@
 using Discord;
 using Discord.Interactions;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using SundouleiaAPI.Enums;
+using SundouleiaAPI.Hub;
 using SundouleiaDiscord.Modules.Popups;
 using SundouleiaShared.Data;
 using SundouleiaShared.Utils;
@@ -57,9 +59,9 @@ public partial class AccountWizard
         // grab the database context
         using var db = await GetDbContext().ConfigureAwait(false);
         // if we enter this menu at all, for whatever reason, we should remove the user from the claimauth table, and the initial key mapping.
-        var entry = await db.AccountClaimAuth.SingleOrDefaultAsync(u => u.DiscordId == Context.User.Id).ConfigureAwait(false);
-        if (entry != null)
-            db.AccountClaimAuth.Remove(entry);
+        if (await db.AccountClaimAuth.SingleOrDefaultAsync(u => u.DiscordId == Context.User.Id).ConfigureAwait(false) is { } existing)
+            db.AccountClaimAuth.Remove(existing);
+
         _botServices.DiscordInitialKeyMapping.TryRemove(Context.User.Id, out _);
         _botServices.DiscordVerifiedUsers.TryRemove(Context.User.Id, out _);
 
@@ -73,7 +75,6 @@ public partial class AccountWizard
     /// <summary>
     /// Called upon by the registration start model, and will prompt the user to provide them with the initial key generated for them.
     /// </summary>
-    /// <param name="initialkeymodal"> the modal to display the initial key prompt</param>
     [ModalInteraction("wizard-claim-account-modal")]
     public async Task ModalRegister(InitialKeyModal initialKeyModal)
     {
@@ -85,15 +86,18 @@ public partial class AccountWizard
         EmbedBuilder eb = new();
         eb.WithColor(Color.Gold);
         // provide the registration modal and await the response, returns if the registration was successful or not, and the verification code.
-        bool success = HandleRegisterModalAsync(eb, initialKeyModal);
+        bool success = await HandleRegisterModalAsync(eb, initialKeyModal).ConfigureAwait(false);
         // while we handle the registration for the modal, construct the component builder allowing the user to cancel, verify, or try again.
         ComponentBuilder cb = new();
         cb.WithButton("Cancel", "wizard-claim", ButtonStyle.Secondary, emote: new Emoji("❌"));
 
         // if the modal returned successful, allow them to verify (pass in item2, the verification)
-        if (success) cb.WithButton("Send Verification Code to Client", "wizard-claim-verify-start:"+initialKeyModal.InitialKeyStr, ButtonStyle.Primary, emote: new Emoji("✅"));
+        if (success)
+            cb.WithButton("Send Verification Code to Client", "wizard-claim-verify-start:"+initialKeyModal.InitialKeyStr, ButtonStyle.Primary, emote: new Emoji("✅"));
         // otherwise, ask them to try again, stepping back to where we ask them for the initial key. Often we get here is the key is not correct.
-        else cb.WithButton("Try again", "wizard-claim-start", ButtonStyle.Primary, emote: new Emoji("🔁"));
+        else
+            cb.WithButton("Try again", "wizard-claim-start", ButtonStyle.Primary, emote: new Emoji("🔁"));
+        
         await ModifyModalInteraction(eb, cb).ConfigureAwait(false);
     }
 
@@ -166,34 +170,29 @@ public partial class AccountWizard
     }
 
     /// <summary>
-    /// Called by the start of the registration when asking for the initial key.
+    ///     Called by the start of the registration when asking for the initial key.
     /// </summary>
     /// <param name="embed"> the embed builder for the message </param>
     /// <param name="arg"> the initial key modal as an argument passed in. </param>
     /// <returns> if it was sucessful or not, and the verification code string. </returns>
-    private bool HandleRegisterModalAsync(EmbedBuilder embed, InitialKeyModal arg)
+    private async Task<bool> HandleRegisterModalAsync(EmbedBuilder embed, InitialKeyModal arg)
     {
         // at this point in time, remember that we have no accountClaimAuth object, only a user and auth object.
-        using var scope = _services.CreateScope();
-        using var db = scope.ServiceProvider.GetService<SundouleiaDbContext>();
+        using var db = await GetDbContext().ConfigureAwait(false);
+
         // if it is empty, fail the handle.
         if (arg.InitialKeyStr is null)
         {
             embed.WithTitle("Initial key was not provided in the modal. Try again.");
             return false;
         }
-
-        // Get the hashed key.
-        using var sha256 = SHA256.Create();
-        var hashedKey = BitConverter.ToString(sha256.ComputeHash(Encoding.UTF8.GetBytes(arg.InitialKeyStr))).Replace("-", "", StringComparison.Ordinal);
-
         // otherwise, if the initial key is not in our database, then someone is trying to forge it
-        if (!db.Auth.Any(a => a.HashedKey == hashedKey))
+        else if (!db.Auth.AsNoTracking().Any(a => a.HashedKey == arg.InitialKeyStr))
         {
             embed.WithTitle("This secret key is not being used by any users, or you pasted it in wrong.");
             return false;
         }
-        if (db.AccountClaimAuth.Any(a => a.InitialGeneratedKey == hashedKey))
+        else if (db.AccountClaimAuth.AsNoTracking().Any(a => a.InitialGeneratedKey == arg.InitialKeyStr))
         {
             embed.WithTitle("This secret key has already been claimed by another user.");
             return false;
@@ -205,6 +204,10 @@ public partial class AccountWizard
             + $"**Send the code to the client once you are logged in and connected.**\n\n"
             + "Verification will expire in 10minutes starting now.\n"
             + "If you fail to verify, you'll have to register again.");
+
+        // Get the hashed key.
+        using var sha256 = SHA256.Create();
+        var hashedKey = BitConverter.ToString(sha256.ComputeHash(Encoding.UTF8.GetBytes(arg.InitialKeyStr))).Replace("-", "", StringComparison.Ordinal);
 
         // store the initial key to the initial key mapping.
         _botServices.DiscordInitialKeyMapping[Context.User.Id] = (hashedKey, string.Empty);
@@ -266,13 +269,10 @@ public partial class AccountWizard
         authClaim.InitialGeneratedKey = null;
         authClaim.StartedAt = null;
         authClaim.VerificationCode = null;
-
         // declare the user since it is now verified.
         authClaim.User = user;
-
         // mark the user as verified and set the last login time to now.
         user.LastLogin = DateTime.UtcNow;
-
         // set Verified to true for the rep.
         rep.IsVerified = true;
 
@@ -339,24 +339,11 @@ public partial class AccountWizard
         // await for the database to save changes
         await dbContext.SaveChangesAsync().ConfigureAwait(false);
 
-        // Reconnect them automatically, if possible.
-        try
-        {
-            using HttpClient client = new HttpClient();
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _tokenGen.Token);
+        // Process a forced hard reconnect for the target user
+        // Send back to this user they got a strike, along with a forced reconnection.
+        await _hubContext.Clients.User(user.UID).SendAsync(nameof(ISundouleiaHub.Callback_HardReconnectMessage),
+            MessageSeverity.Information, "Reconnecting to refresh Vanity status update after account claim.", ServerState.ForcedReconnect).ConfigureAwait(false);
 
-            // Only force reconnect this individual
-            HardReconnectMessage payload = new HardReconnectMessage(MessageSeverity.Information, "Force Reconnecting", ServerState.ForcedReconnect, user.UID);
-            string jsonPayload = JsonSerializer.Serialize(payload);
-            _logger.LogInformation("Sending message to {uri} with payload: {jsonPayload}",
-                new Uri(_discordConfig.GetValue<Uri>(nameof(DiscordConfig.MainServerAddress)), "/msgc/forceHardReconnect"), jsonPayload);
-
-            using HttpResponseMessage response = await client.PostAsJsonAsync(new Uri(_discordConfig.GetValue<Uri>(nameof(DiscordConfig.MainServerAddress)), "/msgc/forceHardReconnect"), payload).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError($"Failed to force reconnect {user.UID} after successful verification. User may need to manually reconnect. [{ex}]");
-        }
         // return success with the user's UID
         return (true, user.UID, initialKey);
     }

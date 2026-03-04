@@ -1,9 +1,11 @@
 using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
 using SundouleiaAPI.Enums;
+using SundouleiaServer.Hubs;
 using SundouleiaShared.Data;
 using SundouleiaShared.Models;
 using SundouleiaShared.Services;
@@ -21,8 +23,9 @@ public partial class AccountWizard : InteractionModuleBase
     private IServiceProvider _services;
     private ServerTokenGenerator _tokenGen;
     private DiscordBotServices _botServices;
-    private IConfigurationService<ServerConfig> _serverConfig;
+    private IConfigurationService<ServerConfiguration> _serverConfig;
     private IConfigurationService<DiscordConfig> _discordConfig;
+    private IHubContext<SundouleiaHub> _hubContext;
     private IConnectionMultiplexer _multiplexer;
     private IDbContextFactory<SundouleiaDbContext> _dbContextFactory;
     private Random random = new();
@@ -32,8 +35,9 @@ public partial class AccountWizard : InteractionModuleBase
         IServiceProvider services,
         ServerTokenGenerator tokenGen,
         DiscordBotServices botServices,
-        IConfigurationService<ServerConfig> serverConfig, 
-        IConfigurationService<DiscordConfig> discordConfig, 
+        IConfigurationService<ServerConfiguration> serverConfig, 
+        IConfigurationService<DiscordConfig> discordConfig,
+        IHubContext<SundouleiaHub> hubContext,
         IConnectionMultiplexer multiplexer,
         IDbContextFactory<SundouleiaDbContext> dbContextFactory)
     {
@@ -43,6 +47,7 @@ public partial class AccountWizard : InteractionModuleBase
         _botServices = botServices;
         _serverConfig = serverConfig;
         _discordConfig = discordConfig;
+        _hubContext = hubContext;
         _multiplexer = multiplexer;
         _dbContextFactory = dbContextFactory;
     }

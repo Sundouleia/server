@@ -43,7 +43,7 @@ public partial class SundouleiaHub : Hub<ISundouleiaHub>, ISundouleiaHub
     public SundouleiaHub(
         ILogger<SundouleiaHub> logger,
         IDbContextFactory<SundouleiaDbContext> dbFactory,
-        IConfigurationService<ServerConfig> config,
+        IConfigurationService<ServerConfiguration> config,
         SundouleiaMetrics metrics,
         RadarService radarService,
         SystemInfoService systemInfoService,
@@ -60,7 +60,7 @@ public partial class SundouleiaHub : Hub<ISundouleiaHub>, ISundouleiaHub
         _fileHost = fileHost;
         _dbContextLazy = new Lazy<SundouleiaDbContext>(() => dbFactory.CreateDbContext());
 
-        _expectedClientVersion = config.GetValueOrDefault(nameof(ServerConfig.ExpectedClientVersion), new Version(0, 0, 0));
+        _expectedClientVersion = config.GetValueOrDefault(nameof(ServerConfiguration.ExpectedClientVersion), new Version(0, 0, 0));
     }
 
     protected override void Dispose(bool disposing)

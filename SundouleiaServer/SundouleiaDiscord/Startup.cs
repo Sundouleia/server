@@ -64,7 +64,7 @@ public class Startup
         services.AddSingleton(m => new SundouleiaMetrics(m.GetService<ILogger<SundouleiaMetrics>>(), new List<string> { }, new List<string> { }));
 
         // Setup Redis.
-        var redis = sundouleiaConfig.GetValue(nameof(ServerConfig.RedisConnectionString), string.Empty);
+        var redis = sundouleiaConfig.GetValue(nameof(ServerConfiguration.RedisConnectionString), string.Empty);
         var options = ConfigurationOptions.Parse(redis);
         options.ClientName = "Sundouleia";
         options.ChannelPrefix = new RedisChannel("UserData", RedisChannel.PatternMode.Literal);
@@ -109,7 +109,7 @@ public class Startup
 
         // Add the configs from discord and the server and the base.
         services.Configure<DiscordConfig>(sundouleiaConfig);
-        services.Configure<ServerConfig>(sundouleiaConfig);
+        services.Configure<ServerConfiguration>(sundouleiaConfig);
         services.Configure<SundouleiaConfigBase>(sundouleiaConfig);
 
         // Inject the remaining services.
@@ -118,10 +118,10 @@ public class Startup
         services.AddSingleton<DiscordBotServices>();
         services.AddHostedService<DiscordBot>();
         services.AddSingleton<IConfigurationService<DiscordConfig>, SundouleiaConfigServiceServer<DiscordConfig>>();
-        services.AddSingleton<IConfigurationService<ServerConfig>, SundouleiaConfigServiceClient<ServerConfig>>();
+        services.AddSingleton<IConfigurationService<ServerConfiguration>, SundouleiaConfigServiceClient<ServerConfiguration>>();
         services.AddSingleton<IConfigurationService<SundouleiaConfigBase>, SundouleiaConfigServiceClient<SundouleiaConfigBase>>();
 
         services.AddHostedService(p => (SundouleiaConfigServiceClient<SundouleiaConfigBase>)p.GetService<IConfigurationService<SundouleiaConfigBase>>());
-        services.AddHostedService(p => (SundouleiaConfigServiceClient<ServerConfig>)p.GetService<IConfigurationService<ServerConfig>>());
+        services.AddHostedService(p => (SundouleiaConfigServiceClient<ServerConfiguration>)p.GetService<IConfigurationService<ServerConfiguration>>());
     }
 }

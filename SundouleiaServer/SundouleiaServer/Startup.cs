@@ -83,7 +83,7 @@ public class Startup
     private void ConfigureSundouleiaServices(IServiceCollection services, IConfigurationSection sundouleiaConfig)
     {
         // configure the server configurations for both the server config and the sundouleia config base.
-        services.Configure<ServerConfig>(Configuration.GetRequiredSection("Sundouleia"));
+        services.Configure<ServerConfiguration>(Configuration.GetRequiredSection("Sundouleia"));
         services.Configure<SundouleiaConfigBase>(Configuration.GetRequiredSection("Sundouleia"));
         _logger.LogInformation("Server Configurations configured");
         // next, add the server token generator, system info service, and online synced pair cache service to the services
@@ -99,7 +99,7 @@ public class Startup
         _logger.LogInformation("System Info Service Hosted Service added");
 
         // configure services for the main server status
-        services.AddSingleton<IConfigurationService<ServerConfig>, SundouleiaConfigServiceServer<ServerConfig>>();
+        services.AddSingleton<IConfigurationService<ServerConfiguration>, SundouleiaConfigServiceServer<ServerConfiguration>>();
         services.AddSingleton<IConfigurationService<SundouleiaConfigBase>, SundouleiaConfigServiceServer<SundouleiaConfigBase>>();
         _logger.LogInformation("Main Server Status Configurations configured");
 
@@ -156,7 +156,7 @@ public class Startup
         });
 
         // lets now configure our redi's connection for the signalR connection
-        string redisConnection = sundouleiaConfig.GetValue(nameof(ServerConfig.RedisConnectionString), string.Empty);
+        string redisConnection = sundouleiaConfig.GetValue(nameof(ServerConfiguration.RedisConnectionString), string.Empty);
         if (string.IsNullOrWhiteSpace(redisConnection))
         {
             logger.LogError("Redis connection string is missing or empty in the configuration.");
@@ -209,7 +209,7 @@ public class Startup
                 UnreachableServerAction = ServerEnumerationStrategy.UnreachableServerActionOptions.Throw,
             },
             MaxValueLength = 1024,                                                  // declare the max value length
-            PoolSize = sundouleiaConfig.GetValue(nameof(ServerConfig.RedisPool), 50), // the max pool size
+            PoolSize = sundouleiaConfig.GetValue(nameof(ServerConfiguration.RedisPool), 50), // the max pool size
             SyncTimeout = options.SyncTimeout,                                      // and the sync timeout.
         };
 

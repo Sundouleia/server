@@ -19,7 +19,7 @@ public class Program
             using var dbContext = services.GetRequiredService<SundouleiaDbContext>();
             // Get the Discord configuration options.
             var options = host.Services.GetService<IConfigurationService<DiscordConfig>>();
-            var optionsServer = host.Services.GetService<IConfigurationService<ServerConfig>>();
+            var optionsServer = host.Services.GetService<IConfigurationService<ServerConfiguration>>();
             var logger = host.Services.GetService<ILogger<Program>>();
 
             // Both should be valid here!

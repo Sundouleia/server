@@ -14,14 +14,14 @@ namespace SundouleiaServer.Services;
 public sealed class SystemInfoService : BackgroundService
 {
     private readonly SundouleiaMetrics _metrics;
-    private readonly IConfigurationService<ServerConfig> _config;
+    private readonly IConfigurationService<ServerConfiguration> _config;
     private readonly IDbContextFactory<SundouleiaDbContext> _dbContextFactory;
     private readonly ILogger<SystemInfoService> _logger;
     private readonly IHubContext<SundouleiaHub, ISundouleiaHub> _hubContext;
     private readonly IRedisDatabase _redis;
     public ServerInfoResponse SystemInfoDto { get; private set; } = new(0);
 
-    public SystemInfoService(SundouleiaMetrics metrics, IConfigurationService<ServerConfig> config, 
+    public SystemInfoService(SundouleiaMetrics metrics, IConfigurationService<ServerConfiguration> config, 
         IDbContextFactory<SundouleiaDbContext> dbContextFactory, ILogger<SystemInfoService> logger, 
         IHubContext<SundouleiaHub, ISundouleiaHub> hubContext, IRedisDatabase redis)
     {

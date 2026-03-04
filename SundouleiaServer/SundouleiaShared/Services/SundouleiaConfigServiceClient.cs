@@ -29,8 +29,8 @@ public class SundouleiaConfigServiceClient<T> : IHostedService, IConfigurationSe
 
     private Uri GetRoute(string key, string value)
     {
-        if (_config.CurrentValue.GetType() == typeof(ServerConfig))
-            return new Uri((_config.CurrentValue as ServerConfig).MainServerAddress, $"configuration/SundouleiaServerConfig/{nameof(SundouleiaServerConfigController.GetConfigurationEntry)}?key={key}&defaultValue={value}");
+        if (_config.CurrentValue.GetType() == typeof(ServerConfiguration))
+            return new Uri((_config.CurrentValue as ServerConfiguration).MainServerAddress, $"configuration/SundouleiaServerConfig/{nameof(SundouleiaServerConfigController.GetConfigurationEntry)}?key={key}&defaultValue={value}");
         if (_config.CurrentValue.GetType() == typeof(SundouleiaConfigBase))
             return new Uri((_config.CurrentValue as SundouleiaConfigBase).MainServerAddress, $"configuration/SundouleiaBaseConfiguration/{nameof(SundouleiaBaseConfigController.GetConfigurationEntry)}?key={key}&defaultValue={value}");
         if (_config.CurrentValue.GetType() == typeof(DiscordConfig))

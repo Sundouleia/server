@@ -24,9 +24,7 @@ public class ClientPairPermissions
     public bool AllowVfx        { get; set; } = true;  // if modded vfx should should sync.
 
     // Default Moodles related permissions when initializing a pair with someone.
-    public MoodleAccess MoodleAccess    { get; set; } = MoodleAccess.None;
-    public TimeSpan     MaxMoodleTime   { get; set; } = TimeSpan.Zero;
-
-    // If we should share limited/full moodles information (avoid full for now)
-    public bool         ShareOwnMoodles { get; set; } = false;
+    public LociAccess   LociAccess       { get; set; } = LociAccess.None;
+    public TimeSpan     MaxLociTime      { get; set; } = TimeSpan.Zero;
+    public bool         ShareOwnLociData { get; set; } = false;
 }

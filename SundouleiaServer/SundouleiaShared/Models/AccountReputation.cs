@@ -3,11 +3,6 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace SundouleiaShared.Models;
 
-
-// Reputation resolving around said user.
-// Determines if a user is verified, or what restrictions are placed upon them.
-// Also provides the time they were applied, if they have timeout periods.and when they got applied.
-// Useful as a form of moderation, to keep the 'wild people' in check. *catscream*
 /// <summary>
 ///     Reputation resolving around said user, determining if they are verified, banned,
 ///     or have certain restrictions placed upon them. <para />
@@ -31,8 +26,11 @@ public class AccountReputation
     // Helpers that are unmapped for Ban detection.
     [NotMapped] public int WarningStrikes => ProfileViewStrikes + ProfileEditStrikes + RadarStrikes + ChatStrikes;
     [NotMapped] public bool ShouldBan => WarningStrikes >= 5;
-    [NotMapped] public bool NeedsTimeoutReset => ProfileViewTimeout != DateTime.MinValue || ProfileEditTimeout != DateTime.MinValue || RadarTimeout != DateTime.MinValue || ChatTimeout != DateTime.MinValue;
-
+    [NotMapped] public bool NeedsTimeoutReset
+        => ProfileViewTimeout != DateTime.MinValue
+        || ProfileEditTimeout != DateTime.MinValue
+        || ChatTimeout != DateTime.MinValue;
+    
     // Reputations are outlined as follows:
     // - If they can do it.
     // - If timed out, when it expires. (in UTC)
@@ -58,5 +56,6 @@ public class AccountReputation
     public DateTime ChatTimeout { get; set; } = DateTime.MinValue;
     public int      ChatStrikes { get; set; } = 0;
 
-    // Additional reputation states can be setup here as time passes.
+    // When a bad report is made.
+    public int FalseReportStrikes { get; set; } = 0;
 }

@@ -24,7 +24,7 @@ public class Program
             // then, get the sundouleia database context from the services
             using SundouleiaDbContext context = services.GetRequiredService<SundouleiaDbContext>();
             // next, lets get the options from the services under the server config IConfigurationService
-            IConfigurationService<ServerConfig> options = services.GetRequiredService<IConfigurationService<ServerConfig>>();
+            IConfigurationService<ServerConfiguration> options = services.GetRequiredService<IConfigurationService<ServerConfiguration>>();
             // now, snag the logger for the program class
             ILogger<Program> logger = host.Services.GetRequiredService<ILogger<Program>>();
 

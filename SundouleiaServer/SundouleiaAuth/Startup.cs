@@ -205,7 +205,7 @@ public class Startup
     private static void ConfigureRedis(IServiceCollection services, IConfigurationSection sundouleiaConfig)
     {
         // define the redi's connection string as the string provided in the serverConfig
-        string redisConnection = sundouleiaConfig.GetValue(nameof(ServerConfig.RedisConnectionString), string.Empty);
+        string redisConnection = sundouleiaConfig.GetValue(nameof(ServerConfiguration.RedisConnectionString), string.Empty);
         // fetch the options from parsing out the redi's connection
         ConfigurationOptions options = ConfigurationOptions.Parse(redisConnection);
 
@@ -248,7 +248,7 @@ public class Startup
                 UnreachableServerAction = ServerEnumerationStrategy.UnreachableServerActionOptions.Throw, // throw an exception if the server is unreachable
             },
             MaxValueLength = 1024, // max val length (huh?)
-            PoolSize = sundouleiaConfig.GetValue(nameof(ServerConfig.RedisPool), 50), // set the number of connections in the pool to the value in the config, or 50.
+            PoolSize = sundouleiaConfig.GetValue(nameof(ServerConfiguration.RedisPool), 50), // set the number of connections in the pool to the value in the config, or 50.
             SyncTimeout = options.SyncTimeout, // determine the sync timeout for redi's.
             LoggerFactory = services.BuildServiceProvider().GetRequiredService<ILoggerFactory>(), // get the logger factory from the services.
         };

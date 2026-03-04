@@ -21,9 +21,7 @@ public class GlobalPermissions
     public bool DefaultAllowVfx         { get; set; } = true;
 
     // Default Moodles related permissions when initializing a pair with someone.
-    public MoodleAccess DefaultMoodleAccess     { get; set; } = MoodleAccess.None;
-    public TimeSpan     DefaultMaxMoodleTime    { get; set; } = TimeSpan.Zero;
-    public bool         DefaultShareOwnMoodles  { get; set; } = false;
-
-    // Other stuff that can be added later on..
+    public LociAccess DefaultLociAccess       { get; set; } = LociAccess.None;
+    public TimeSpan   DefaultMaxLociTime      { get; set; } = TimeSpan.Zero;
+    public bool       DefaultShareOwnLociData { get; set; } = false;
 }

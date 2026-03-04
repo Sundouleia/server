@@ -38,22 +38,24 @@ public static class SharedDbFunctions
     {
         var retDict = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         // Obtain the caller's Auth entry, which contains the User entry inside.
-        if (await dbContext.Auth.AsNoTracking().Include(a => a.User).SingleOrDefaultAsync(a => a.UserUID == user.UID).ConfigureAwait(false) is not { } callerAuth)
+        if (await dbContext.Auth.Include(a => a.User).SingleOrDefaultAsync(a => a.UserUID == user.UID).ConfigureAwait(false) is not { } callerAuth)
             return retDict;
 
         // If PrimaryUserUID is null or empty, it is the primary profile, and we should remove all alt profiles.
-        if (string.IsNullOrEmpty(callerAuth.PrimaryUserUID))
+        if (callerAuth.PrimaryUserUID.Equals(callerAuth.UserUID))
         {
-            var altProfiles = await dbContext.Auth.AsNoTracking().Include(u => u.User).Where(u => u.PrimaryUserUID == user.UID).Select(c => c.User).ToListAsync().ConfigureAwait(false);
+            var altProfiles = await dbContext.Auth.Include(u => u.User).Where(u => u.PrimaryUserUID == user.UID).Select(c => c.User).ToListAsync().ConfigureAwait(false);
             foreach (var altProfile in altProfiles)
             {
-                var pairedUids = await DeleteProfileInternal(callerAuth.User, logger, dbContext, metrics).ConfigureAwait(false);
-                retDict.Add(callerAuth.User.UID, pairedUids);
+                var altUid = altProfile.UID;
+                var pairedUids = await DeleteProfileInternal(altProfile, logger, dbContext, metrics).ConfigureAwait(false);
+                retDict.Add(altUid, pairedUids);
             }
         }
-        // Remove the primary profile.
+        // Remove the profile.
+        var mainUid = callerAuth.User.UID;
         var pairedMainUids = await DeleteProfileInternal(callerAuth.User, logger, dbContext, metrics).ConfigureAwait(false);
-        retDict.Add(callerAuth.User.UID, pairedMainUids);
+        retDict.Add(mainUid, pairedMainUids);
 
         // return the dictionary of removed profiles and their paired UID's.
         return retDict;
@@ -62,7 +64,7 @@ public static class SharedDbFunctions
     private static async Task<List<string>> DeleteProfileInternal(User user, ILogger logger, SundouleiaDbContext dbContext, SundouleiaMetrics? metrics = null)
     {
         // Account Data. (if auth fails to fetch, this should deservedly throw an exception!.
-        var auth = dbContext.Auth.SingleAsync(a => a.UserUID == user.UID).ConfigureAwait(false);
+        var auth = dbContext.Auth.Single(a => a.UserUID == user.UID);
         var accountClaim = dbContext.AccountClaimAuth.AsNoTracking().SingleOrDefault(a => a.User != null && a.User.UID == user.UID);
         var reputation = await dbContext.AccountReputation.AsNoTracking().SingleOrDefaultAsync(a => a.UserUID == user.UID).ConfigureAwait(false);
         // Blocked Users.
@@ -92,6 +94,8 @@ public static class SharedDbFunctions
         if (globals is not null) dbContext.Remove(globals);
         if (userProfileData is not null) dbContext.Remove(userProfileData);
         if (radarInfo is not null) dbContext.Remove(radarInfo);
+
+        await dbContext.SaveChangesAsync().ConfigureAwait(false);
 
         // now that everything is finally gone, remove the auth & user.
         dbContext.Remove(auth);

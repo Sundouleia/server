@@ -17,12 +17,12 @@ namespace SundouleiaServer.Services;
 public class UserCleanupService : BackgroundService
 {
     private readonly SundouleiaMetrics _metrics;
-    private readonly IConfigurationService<ServerConfig> _config;
+    private readonly IConfigurationService<ServerConfiguration> _config;
     private readonly IDbContextFactory<SundouleiaDbContext> _dbContextFactory;
     private readonly ILogger<UserCleanupService> _logger;
     private readonly IHubContext<SundouleiaHub, ISundouleiaHub> _hubContext;
 
-    public UserCleanupService(SundouleiaMetrics metrics, IConfigurationService<ServerConfig> config,
+    public UserCleanupService(SundouleiaMetrics metrics, IConfigurationService<ServerConfiguration> config,
         IDbContextFactory<SundouleiaDbContext> dbContextFactory, ILogger<UserCleanupService> logger, 
         IHubContext<SundouleiaHub, ISundouleiaHub> hubContext)
     {
@@ -116,9 +116,9 @@ public class UserCleanupService : BackgroundService
     {
         try
         {
-            if (_config.GetValueOrDefault(nameof(ServerConfig.PurgeUnusedAccounts), false))
+            if (_config.GetValueOrDefault(nameof(ServerConfiguration.PurgeUnusedAccounts), false))
             {
-                int usersOlderThanDays = _config.GetValueOrDefault(nameof(ServerConfig.PurgeUnusedAccountsPeriodInDays), 300);
+                int usersOlderThanDays = _config.GetValueOrDefault(nameof(ServerConfiguration.PurgeUnusedAccountsPeriodInDays), 300);
 
                 _logger.LogInformation("Cleaning up users older than {usersOlderThanDays} days", usersOlderThanDays);
 

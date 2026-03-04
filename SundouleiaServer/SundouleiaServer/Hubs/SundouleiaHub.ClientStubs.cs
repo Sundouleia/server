@@ -27,14 +27,14 @@ public partial class SundouleiaHub
     public Task Callback_Unblocked(UserDto _) => throw new PlatformNotSupportedException(UnsupportedMessage);
 
     // --- Moodles Integration Callbacks ---
-    public Task Callback_PairMoodleDataUpdated(MoodlesDataUpdate _) => throw new PlatformNotSupportedException(UnsupportedMessage);
-    public Task Callback_PairMoodleStatusesUpdate(MoodlesStatusesUpdate _) => throw new PlatformNotSupportedException(UnsupportedMessage);
-    public Task Callback_PairMoodlePresetsUpdate(MoodlesPresetsUpdate _) => throw new PlatformNotSupportedException(UnsupportedMessage);
-    public Task Callback_PairMoodleStatusModified(MoodlesStatusModified _) => throw new PlatformNotSupportedException(UnsupportedMessage);
-    public Task Callback_PairMoodlePresetModified(MoodlesPresetModified _) => throw new PlatformNotSupportedException(UnsupportedMessage);
-    public Task Callback_ApplyMoodleId(ApplyMoodleId _) => throw new PlatformNotSupportedException(UnsupportedMessage);
-    public Task Callback_ApplyMoodleStatus(ApplyMoodleStatus _) => throw new PlatformNotSupportedException(UnsupportedMessage);
-    public Task Callback_RemoveMoodleId(RemoveMoodleId _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_PairLociDataUpdated(LociDataUpdate _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_PairLociStatusesUpdate(LociStatusesUpdate _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_PairLociPresetsUpdate(LociPresetsUpdate _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_PairLociStatusModified(LociStatusModified _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_PairLociPresetModified(LociPresetModified _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_ApplyLociDataById(ApplyLociDataById _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_ApplyLociStatus(ApplyLociStatus _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_RemoveLociData(RemoveLociData _) => throw new PlatformNotSupportedException(UnsupportedMessage);
 
     // --- Data Update Callbacks ---
     public Task Callback_IpcUpdateFull(IpcUpdateFull _) => throw new PlatformNotSupportedException(UnsupportedMessage);

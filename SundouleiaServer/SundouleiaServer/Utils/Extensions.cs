@@ -11,12 +11,16 @@ public static class Extensions
     public static void UpdateInfoFromDto(this UserProfileData storedData, ProfileContent dto)
     {
         storedData.IsPublic = dto.IsPublic;
+        storedData.IsNSFW = dto.IsNSFW;
+        storedData.FlaggedForReport = dto.Flagged;
 
         storedData.AvatarVis = dto.AvatarVis;
         storedData.DescriptionVis = dto.DescriptionVis;
         storedData.DecorationVis = dto.DecorationVis;
 
         storedData.Description = dto.Description;
+        storedData.EarnedAchievements = dto.CompletedTotal;
+        storedData.TitleId = dto.ChosenTitleId;
 
         storedData.MainBG = dto.MainBG;
         storedData.MainBorder = dto.MainBorder;
@@ -34,8 +38,8 @@ public static class Extensions
         => new ProfileContent()
         {
             IsPublic = data.IsPublic,
+            IsNSFW = data.IsNSFW,
             Flagged = data.FlaggedForReport,
-            Disabled = data.IsDisabled,
             AvatarVis = data.AvatarVis,
             DescriptionVis = data.DescriptionVis,
             DecorationVis = data.DecorationVis,
@@ -68,9 +72,9 @@ public static class Extensions
             DefaultAllowAnimations = dbState.DefaultAllowAnimations,
             DefaultAllowSounds = dbState.DefaultAllowSounds,
             DefaultAllowVfx = dbState.DefaultAllowVfx,
-            DefaultMoodleAccess = dbState.DefaultMoodleAccess,
-            DefaultMaxMoodleTime = dbState.DefaultMaxMoodleTime,
-            DefaultShareOwnMoodles = dbState.DefaultShareOwnMoodles
+            DefaultLociAccess = dbState.DefaultLociAccess,
+            DefaultMaxLociTime = dbState.DefaultMaxLociTime,
+            DefaultShareOwnLociData = dbState.DefaultShareOwnLociData,
         };
 
     public static PairPerms ToApi(this ClientPairPermissions? dbState)
@@ -80,9 +84,9 @@ public static class Extensions
             AllowAnimations = dbState.AllowAnimations,
             AllowSounds = dbState.AllowSounds,
             AllowVfx = dbState.AllowVfx,
-            MoodleAccess = dbState.MoodleAccess,
-            MaxMoodleTime = dbState.MaxMoodleTime,
-            ShareOwnMoodles = dbState.ShareOwnMoodles
+            LociAccess = dbState.LociAccess,
+            MaxLociTime = dbState.MaxLociTime,
+            ShareOwnLociData = dbState.ShareOwnLociData
         };
 
     public static UserReputation ToApi(this AccountReputation? dbState)
@@ -109,9 +113,9 @@ public static class Extensions
         current.DefaultAllowAnimations = api.DefaultAllowAnimations;
         current.DefaultAllowSounds = api.DefaultAllowSounds;
         current.DefaultAllowVfx = api.DefaultAllowVfx;
-        current.DefaultMoodleAccess = api.DefaultMoodleAccess;
-        current.DefaultMaxMoodleTime = api.DefaultMaxMoodleTime;
-        current.DefaultShareOwnMoodles = api.DefaultShareOwnMoodles;
+        current.DefaultLociAccess = api.DefaultLociAccess;
+        current.DefaultMaxLociTime = api.DefaultMaxLociTime;
+        current.DefaultShareOwnLociData = api.DefaultShareOwnLociData;
     }
 
     public static void UpdateDbModel(this PairPerms api, ClientPairPermissions current)
@@ -123,9 +127,9 @@ public static class Extensions
         current.AllowAnimations = api.AllowAnimations;
         current.AllowSounds = api.AllowSounds;
         current.AllowVfx = api.AllowVfx;
-        current.MoodleAccess = api.MoodleAccess;
-        current.MaxMoodleTime = api.MaxMoodleTime;
-        current.ShareOwnMoodles = api.ShareOwnMoodles;
+        current.LociAccess = api.LociAccess;
+        current.MaxLociTime = api.MaxLociTime;
+        current.ShareOwnLociData = api.ShareOwnLociData;
     }
 }
 #nullable disable
