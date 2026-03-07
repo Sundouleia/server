@@ -186,13 +186,18 @@ public partial class AccountWizard
             embed.WithTitle("Initial key was not provided in the modal. Try again.");
             return false;
         }
-        // otherwise, if the initial key is not in our database, then someone is trying to forge it
-        else if (!db.Auth.AsNoTracking().Any(a => a.HashedKey == arg.InitialKeyStr))
+
+        // Get the hashed key.
+        using var sha256 = SHA256.Create();
+        var hashedKey = BitConverter.ToString(sha256.ComputeHash(Encoding.UTF8.GetBytes(arg.InitialKeyStr))).Replace("-", "", StringComparison.Ordinal);
+
+        // if the initial key is not in our database, then someone is trying to forge it
+        if (!db.Auth.AsNoTracking().Any(a => a.HashedKey == hashedKey))
         {
             embed.WithTitle("This secret key is not being used by any users, or you pasted it in wrong.");
             return false;
         }
-        else if (db.AccountClaimAuth.AsNoTracking().Any(a => a.InitialGeneratedKey == arg.InitialKeyStr))
+        else if (db.AccountClaimAuth.AsNoTracking().Any(a => a.InitialGeneratedKey == hashedKey))
         {
             embed.WithTitle("This secret key has already been claimed by another user.");
             return false;
@@ -204,10 +209,6 @@ public partial class AccountWizard
             + $"**Send the code to the client once you are logged in and connected.**\n\n"
             + "Verification will expire in 10minutes starting now.\n"
             + "If you fail to verify, you'll have to register again.");
-
-        // Get the hashed key.
-        using var sha256 = SHA256.Create();
-        var hashedKey = BitConverter.ToString(sha256.ComputeHash(Encoding.UTF8.GetBytes(arg.InitialKeyStr))).Replace("-", "", StringComparison.Ordinal);
 
         // store the initial key to the initial key mapping.
         _botServices.DiscordInitialKeyMapping[Context.User.Id] = (hashedKey, string.Empty);

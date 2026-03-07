@@ -398,11 +398,12 @@ internal partial class DiscordBot : IHostedService
         var ckRoles = _discordConfig.GetValueOrDefault(nameof(ServerDiscordConfig.CkVanityRoles), new Dictionary<ulong, string>());
         var sundouleiaRoleToId = sundouleiaRoles.ToDictionary(kvp => kvp.Value, kvp => kvp.Key, StringComparer.Ordinal);
 
+        // This is heavily unoptimized, preferably run 2 passes to collect all users in both discords, then iterate over the data and set accordingly.
         using var scope = _services.CreateAsyncScope();
         using (var db = scope.ServiceProvider.GetRequiredService<SundouleiaDbContext>())
         {
             // Obtain all verified sundouleia accounts to narrow our search.
-            var verifiedUsersWithoutPerks = await db.AccountReputation.Include(r => r.User).AsNoTracking()
+            var verifiedUsersWithoutPerks = await db.AccountReputation.Include(r => r.User)
                 .Where(r => r.IsVerified && r.User.Tier == CkVanityTier.NoRole)
                 .ToListAsync()
                 .ConfigureAwait(false);
@@ -414,14 +415,14 @@ internal partial class DiscordBot : IHostedService
             foreach (var verifiedAccount in verifiedUsersWithoutPerks)
             {
                 // Ensure they have a valid auth claim (should be unnecessary but never know.
-                if (await db.AccountClaimAuth.AsNoTracking().Include(a => a.User).SingleOrDefaultAsync(a => a.User != null && a.User.UID == verifiedAccount.UserUID).ConfigureAwait(false) is not { } authClaim)
-                {
-                    _logger.LogWarning($"Somehow was a verified account without an auth claim? Report this if seen!");
-                    continue;
-                }
-
                 try
                 {
+                    if (await db.AccountClaimAuth.AsNoTracking().Include(a => a.User).SingleOrDefaultAsync(a => a.User != null && a.User.UID == verifiedAccount.UserUID).ConfigureAwait(false) is not { } authClaim)
+                    {
+                        _logger.LogWarning($"Somehow was a verified account without an auth claim? Report this if seen!");
+                        continue;
+                    }
+
                     // grab the discord user from sundouleia.
                     if (await sundouleiaGuild.GetUserAsync(authClaim.DiscordId).ConfigureAwait(false) is not { } sundouleiaUser)
                     {
@@ -465,8 +466,8 @@ internal partial class DiscordBot : IHostedService
                             .FirstOrDefault();
 
                         // Assign Highest role found.
-                        authClaim.User.Tier = highestRole;
-                        db.Update(authClaim.User);
+                        verifiedAccount.User.Tier = highestRole;
+                        db.Update(verifiedAccount.User);
                         _logger.LogInformation($"User {authClaim.User.UID} assigned to tier {highestRole} (highest role)");
 
                         // Update this on all secondary accounts of this user.
@@ -506,7 +507,7 @@ internal partial class DiscordBot : IHostedService
         using var scope = _services.CreateAsyncScope();
         using (var db = scope.ServiceProvider.GetRequiredService<SundouleiaDbContext>())
         {
-            var vanityUsers = await db.AccountClaimAuth.Include(a => a.User).AsNoTracking()
+            var vanityUsers = await db.AccountClaimAuth.Include(a => a.User)
                 .Where(c => c.User != null && c.User.Tier != CkVanityTier.NoRole)
                 .ToListAsync()
                 .ConfigureAwait(false);
@@ -514,52 +515,59 @@ internal partial class DiscordBot : IHostedService
             // This should account for only the main accounts.
             foreach (var authClaim in vanityUsers)
             {
-                // grab the discord user from sundouleia.
-                if (await sundouleiaGuild.GetUserAsync(authClaim.DiscordId).ConfigureAwait(false) is not { } sundouleiaUser)
+                try
                 {
-                    _logger.LogWarning($"Could not find discord user [{authClaim.DiscordId}] in Sundouleia guild.");
-                    await Task.Delay(250, token).ConfigureAwait(false);
-                    continue;
-                }
+                    // grab the discord user from sundouleia.
+                    if (await sundouleiaGuild.GetUserAsync(authClaim.DiscordId).ConfigureAwait(false) is not { } sundouleiaUser)
+                    {
+                        _logger.LogWarning($"Could not find discord user [{authClaim.DiscordId}] in Sundouleia guild.");
+                        await Task.Delay(250, token).ConfigureAwait(false);
+                        continue;
+                    }
 
-                // If any of their roles have a matched value contained in the SundouleiaCkSupporters list, we should validate them.
-                if (sundouleiaUser.RoleIds.Any(r => sundouleiaRoles.TryGetValue(r, out var label) && SundouleiaCkSupporters.Contains(label, StringComparer.Ordinal)))
-                {
-                    // They have a ck supporter role in sundouleia, so we should validate their roles in ck.
-                    if (await ckGuid.GetUserAsync(authClaim.DiscordId).ConfigureAwait(false) is { } ckUser)
+                    // If any of their roles have a matched value contained in the SundouleiaCkSupporters list, we should validate them.
+                    if (sundouleiaUser.RoleIds.Any(r => sundouleiaRoles.TryGetValue(r, out var label) && SundouleiaCkSupporters.Contains(label, StringComparer.Ordinal)))
                     {
-                        // If none of the ckUser's roleIds are in the dictionary, then we should remove all perks in sundouleia.
-                        if (!ckUser.RoleIds.Any(ckRoles.Keys.Contains))
+                        // They have a ck supporter role in sundouleia, so we should validate their roles in ck.
+                        if (await ckGuid.GetUserAsync(authClaim.DiscordId).ConfigureAwait(false) is { } ckUser)
                         {
-                            _logger.LogInformation($"User {authClaim.User!.UID} no longer has CK supporter roles, removing perks.");
-                            var rolesToRemove = sundouleiaUser.RoleIds.Where(sundouleiaRoles.Keys.Contains);
-                            if (rolesToRemove.Any())
-                                await sundouleiaUser.RemoveRolesAsync(rolesToRemove).ConfigureAwait(false);
+                            // If none of the ckUser's roleIds are in the dictionary, then we should remove all perks in sundouleia.
+                            if (!ckUser.RoleIds.Any(ckRoles.Keys.Contains))
+                            {
+                                _logger.LogInformation($"User {authClaim.User!.UID} no longer has CK supporter roles, removing perks.");
+                                var rolesToRemove = sundouleiaUser.RoleIds.Where(sundouleiaRoles.Keys.Contains);
+                                if (rolesToRemove.Any())
+                                    await sundouleiaUser.RemoveRolesAsync(rolesToRemove).ConfigureAwait(false);
+                            }
                         }
                     }
-                }
-                // Handle normally.
-                else
-                {
-                    if (!sundouleiaUser.RoleIds.Any(sundouleiaRoles.Keys.Contains))
+                    // Handle normally.
+                    else
                     {
-                        _logger.LogInformation($"User {authClaim.User!.UID} not in allowed roles, deleting alias");
-                        authClaim.User.Alias = string.Empty;
-                        authClaim.User.Tier = CkVanityTier.NoRole;
-                        db.Update(authClaim.User);
-                        // Clear out the vanity perks from their alts.
-                        var secondaryUsers = await db.Auth.Include(u => u.User).AsNoTracking().Where(u => u.PrimaryUserUID == authClaim.User.UID).ToListAsync().ConfigureAwait(false);
-                        foreach (var secondaryUser in secondaryUsers)
+                        if (!sundouleiaUser.RoleIds.Any(sundouleiaRoles.Keys.Contains))
                         {
-                            _logger.LogDebug($"Secondary User {secondaryUser!.User!.UID} not in allowed roles, deleting alias & resetting supporter tier");
-                            secondaryUser.User.Alias = string.Empty;
-                            secondaryUser.User.Tier = CkVanityTier.NoRole;
-                            db.Update(secondaryUser.User);
+                            _logger.LogInformation($"User {authClaim.User!.UID} not in allowed roles, deleting alias");
+                            authClaim.User.Alias = string.Empty;
+                            authClaim.User.Tier = CkVanityTier.NoRole;
+                            db.Update(authClaim.User);
+                            // Clear out the vanity perks from their alts.
+                            var secondaryUsers = await db.Auth.Include(u => u.User).Where(u => u.PrimaryUserUID == authClaim.User.UID).ToListAsync().ConfigureAwait(false);
+                            foreach (var secondaryUser in secondaryUsers)
+                            {
+                                _logger.LogDebug($"Secondary User {secondaryUser!.User!.UID} not in allowed roles, deleting alias & resetting supporter tier");
+                                secondaryUser.User.Alias = string.Empty;
+                                secondaryUser.User.Tier = CkVanityTier.NoRole;
+                                db.Update(secondaryUser.User);
+                            }
                         }
                     }
+                    // await for the database to save changes
+                    await db.SaveChangesAsync().ConfigureAwait(false);
                 }
-                // await for the database to save changes
-                await db.SaveChangesAsync().ConfigureAwait(false);
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Error processing user for perk removal: {ex}");
+                }
                 // await a second before checking the next user
                 await Task.Delay(1000, token).ConfigureAwait(false);
             }
