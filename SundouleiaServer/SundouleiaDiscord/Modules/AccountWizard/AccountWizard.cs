@@ -64,7 +64,7 @@ public partial class AccountWizard : InteractionModuleBase
         _logger.LogInformation("{method}:{userId}", nameof(StartAccountManagementWizard), Context.Interaction.User.Id);
 
         // fetch the database context to see if they already have a claimed account.
-        using SundouleiaDbContext sundouleiaDb = await GetDbContext().ConfigureAwait(false);
+        using var sundouleiaDb = await GetDbContext().ConfigureAwait(false);
         // the user has an account of they have an accountClaimAuth in the database matching their discord ID.
         // Additionally, it checks to see if the time started at is null, meaning the claiming process has finished.
         var claimAuth = await sundouleiaDb.AccountClaimAuth.Include(a => a.User).AsNoTracking().SingleOrDefaultAsync(u => u.DiscordId == Context.User.Id).ConfigureAwait(false);
@@ -83,7 +83,6 @@ public partial class AccountWizard : InteractionModuleBase
         {
             descriptionText.AppendLine("- 📖 View your account profile data.");
             descriptionText.AppendLine("- 🏷️ Create a new profile for your account.");
-            descriptionText.AppendLine("- 💄 Setup / Change your vanity perks");
             // descriptionText.AppendLine("- 🏥 Recover To recover a profile secret key, press \"🏥 Recover\"");
             descriptionText.AppendLine("- ⚠️ Select which of your profiles to remove from your account.");
         }
@@ -106,7 +105,6 @@ public partial class AccountWizard : InteractionModuleBase
         {
             cb.WithButton("View Profiles", "wizard-profiles", ButtonStyle.Secondary, new Emoji("📖"));
             cb.WithButton("Add Profile", "wizard-alt-profile", ButtonStyle.Secondary, new Emoji("🏷️"));
-            cb.WithButton("Vanity Perks", "wizard-vanity", ButtonStyle.Secondary, new Emoji("💄"), disabled: !isSupporter);
             cb.WithButton("Recover", "wizard-recover", ButtonStyle.Secondary, new Emoji("🏥"));
             cb.WithButton("Remove", "wizard-remove", ButtonStyle.Danger, new Emoji("⚠️"));
         }
@@ -139,20 +137,6 @@ public partial class AccountWizard : InteractionModuleBase
             await ModifyInteraction(eb, cb).ConfigureAwait(false);
         }
     }
-
-    /// <summary>
-    /// The modal for the vanity Uid modal (user ID) (a confirmation popup)
-    /// likely add more modals for setting additional things for vanity perks
-    /// </summary>
-    public class VanityUidModal : IModal
-    {
-        public string Title => "Create an Alias for your UID";
-
-        [InputLabel("Set your Vanity UID")]
-        [ModalTextInput("vanity_uid", TextInputStyle.Short, "5-15 characters, underscore, dash", 5, 15)]
-        public string DesiredVanityUID { get; set; }
-    }
-
 
     /// <summary> The modal for the confirm deletion display (a confirmation popup) </summary>
     public class ConfirmDeletionModal : IModal
