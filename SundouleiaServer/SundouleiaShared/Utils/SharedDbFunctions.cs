@@ -78,7 +78,6 @@ public static class SharedDbFunctions
         // Globals & State Data
         var globals = await dbContext.UserGlobalPerms.AsNoTracking().SingleOrDefaultAsync(u => u.UserUID == user.UID).ConfigureAwait(false);
         var userProfileData = await dbContext.UserProfileData.AsNoTracking().SingleOrDefaultAsync(u => u.UserUID == user.UID).ConfigureAwait(false);
-        var radarInfo = await dbContext.UserRadarInfo.AsNoTracking().SingleOrDefaultAsync(u => u.UserUID == user.UID).ConfigureAwait(false);
         // Get User Pair List to output.
         var pairedUids = otherPairData.Select(p => p.UserUID);
 
@@ -93,7 +92,6 @@ public static class SharedDbFunctions
         dbContext.RemoveRange(pairPerms);
         if (globals is not null) dbContext.Remove(globals);
         if (userProfileData is not null) dbContext.Remove(userProfileData);
-        if (radarInfo is not null) dbContext.Remove(radarInfo);
 
         await dbContext.SaveChangesAsync().ConfigureAwait(false);
 
@@ -122,7 +120,6 @@ public static class SharedDbFunctions
         // Create all other necessary tables for the user now that it is added successfully.
         await dbContext.UserGlobalPerms.AddAsync(new GlobalPermissions { UserUID = user.UID }).ConfigureAwait(false);
         await dbContext.UserProfileData.AddAsync(new UserProfileData { UserUID = user.UID }).ConfigureAwait(false);
-        await dbContext.UserRadarInfo.AddAsync(new UserRadarInfo { UserUID = user.UID }).ConfigureAwait(false);
 
         logger.LogInformation($"[User {user.UID} (Alias: {user.Alias}) <{user.Tier}>] was created along with other necessary table entries!");
         await dbContext.SaveChangesAsync().ConfigureAwait(false);
@@ -146,7 +143,6 @@ public static class SharedDbFunctions
         // Create all other necessary tables for the user now that it is added successfully.
         await dbContext.UserGlobalPerms.AddAsync(new GlobalPermissions { UserUID = user.UID }).ConfigureAwait(false);
         await dbContext.UserProfileData.AddAsync(new UserProfileData { UserUID = user.UID }).ConfigureAwait(false);
-        await dbContext.UserRadarInfo.AddAsync(new UserRadarInfo { UserUID = user.UID }).ConfigureAwait(false);
 
         logger.LogInformation($"[User {user.UID} (Alias: {user.Alias}) <{user.Tier}>] was created along with other necessary table entries!");
         await dbContext.SaveChangesAsync().ConfigureAwait(false);

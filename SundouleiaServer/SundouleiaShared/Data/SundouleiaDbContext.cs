@@ -54,7 +54,6 @@ public class SundouleiaDbContext : DbContext
     public DbSet<User> Users { get; set; }
     public DbSet<GlobalPermissions> UserGlobalPerms { get; set; }
     public DbSet<UserProfileData> UserProfileData { get; set; }
-    public DbSet<UserRadarInfo> UserRadarInfo { get; set; }
 
     // File Security (For those who want it)
     public DbSet<SMABaseFileData> ProtectedSMAFiles { get; set; }
@@ -111,10 +110,6 @@ public class SundouleiaDbContext : DbContext
         modelBuilder.Entity<GlobalPermissions>().HasIndex(c => c.UserUID);
         modelBuilder.Entity<UserProfileData>().ToTable("user_profile");
         modelBuilder.Entity<UserProfileData>().HasIndex(c => c.UserUID);
-        modelBuilder.Entity<UserRadarInfo>().ToTable("user_radar_info");
-        modelBuilder.Entity<UserRadarInfo>().HasIndex(c => c.UserUID);
-        modelBuilder.Entity<UserRadarInfo>().HasIndex(c => c.TerritoryId);
-        modelBuilder.Entity<UserRadarInfo>().HasIndex(c => c.WorldId);
 
         modelBuilder.Entity<SMABaseFileData>().ToTable("protected_sma_files");
         modelBuilder.Entity<SMABaseFileData>().HasKey(u => new { u.OwnerUID, u.FileId });
