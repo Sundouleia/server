@@ -61,44 +61,79 @@ public static class SharedDbFunctions
         return retDict;
     }
 
-    private static async Task<List<string>> DeleteProfileInternal(User user, ILogger logger, SundouleiaDbContext dbContext, SundouleiaMetrics? metrics = null)
+    private static async Task<List<string>> DeleteProfileInternal(User user, ILogger logger, SundouleiaDbContext db, SundouleiaMetrics? metrics = null)
     {
         // Account Data. (if auth fails to fetch, this should deservedly throw an exception!.
-        var auth = dbContext.Auth.Single(a => a.UserUID == user.UID);
-        var accountClaim = dbContext.AccountClaimAuth.AsNoTracking().SingleOrDefault(a => a.User != null && a.User.UID == user.UID);
-        var reputation = await dbContext.AccountReputation.AsNoTracking().SingleOrDefaultAsync(a => a.UserUID == user.UID).ConfigureAwait(false);
+        var auth = db.Auth.Single(a => a.UserUID == user.UID);
+        var accountClaim = db.AccountClaimAuth.AsNoTracking().SingleOrDefault(a => a.User != null && a.User.UID == user.UID);
+        var reputation = await db.AccountReputation.AsNoTracking().SingleOrDefaultAsync(a => a.UserUID == user.UID).ConfigureAwait(false);
         // Blocked Users.
-        var blockedUsers = await dbContext.BlockedUsers.AsNoTracking().Where(b => b.UserUID == user.UID || b.OtherUserUID == user.UID).ToListAsync().ConfigureAwait(false);
+        var blockedUsers = await db.BlacklistedUsers.AsNoTracking().Where(b => b.UserUID == user.UID || b.BlockedUserUID == user.UID).ToListAsync().ConfigureAwait(false);
         // Pair Data
-        var ownPairData = await dbContext.ClientPairs.AsNoTracking().Where(u => u.User.UID == user.UID).ToListAsync().ConfigureAwait(false);
-        var otherPairData = await dbContext.ClientPairs.AsNoTracking().Where(u => u.OtherUserUID == user.UID).ToListAsync().ConfigureAwait(false);
-        var pairPerms = await dbContext.ClientPairPerms.AsNoTracking().Where(u => u.UserUID == user.UID || u.OtherUserUID == user.UID).ToListAsync().ConfigureAwait(false);
+        var ownPairData = await db.ClientPairs.AsNoTracking().Where(u => u.User.UID == user.UID).ToListAsync().ConfigureAwait(false);
+        var otherPairData = await db.ClientPairs.AsNoTracking().Where(u => u.OtherUserUID == user.UID).ToListAsync().ConfigureAwait(false);
+        var pairPerms = await db.ClientPairPerms.AsNoTracking().Where(u => u.UserUID == user.UID || u.OtherUserUID == user.UID).ToListAsync().ConfigureAwait(false);
         // Requests
-        var requests = await dbContext.Requests.AsNoTracking().Where(u => u.UserUID == user.UID || u.OtherUserUID == user.UID).ToListAsync().ConfigureAwait(false);
+        var requests = await db.Requests.AsNoTracking().Where(u => u.UserUID == user.UID || u.OtherUserUID == user.UID).ToListAsync().ConfigureAwait(false);
+        // Sanctioned Groups
+        var sanctionOwnership = await db.SanctionOwnerships.AsNoTracking().SingleOrDefaultAsync(so => so.UserUID == user.UID).ConfigureAwait(false);
+        var bannedInSanctions = await db.BannedSanctionUsers.Where(g => g.BannedUserUID == user.UID).ToListAsync().ConfigureAwait(false);
+        var hasBannedInSanctions = await db.BannedSanctionUsers.Where(g => g.BannedByUserUID == user.UID).ToListAsync().ConfigureAwait(false);
+
         // Globals & State Data
-        var globals = await dbContext.UserGlobalPerms.AsNoTracking().SingleOrDefaultAsync(u => u.UserUID == user.UID).ConfigureAwait(false);
-        var userProfileData = await dbContext.UserProfileData.AsNoTracking().SingleOrDefaultAsync(u => u.UserUID == user.UID).ConfigureAwait(false);
+        var globals = await db.UserGlobalPerms.AsNoTracking().SingleOrDefaultAsync(u => u.UserUID == user.UID).ConfigureAwait(false);
+        var userProfileData = await db.UserProfileData.AsNoTracking().SingleOrDefaultAsync(u => u.UserUID == user.UID).ConfigureAwait(false);
         // Get User Pair List to output.
         var pairedUids = otherPairData.Select(p => p.UserUID);
 
         // Remove all associated.
-        if (accountClaim is not null) dbContext.Remove(accountClaim);
-        if (reputation is not null) dbContext.Remove(reputation);
+        if (accountClaim is not null) db.Remove(accountClaim);
+        if (reputation is not null) db.Remove(reputation);
 
-        dbContext.RemoveRange(blockedUsers);
+        db.RemoveRange(blockedUsers);
+        db.RemoveRange(bannedInSanctions);
+        db.RemoveRange(hasBannedInSanctions);
 
-        dbContext.RemoveRange(ownPairData);
-        dbContext.RemoveRange(otherPairData);
-        dbContext.RemoveRange(pairPerms);
-        if (globals is not null) dbContext.Remove(globals);
-        if (userProfileData is not null) dbContext.Remove(userProfileData);
+        db.RemoveRange(requests);
 
-        await dbContext.SaveChangesAsync().ConfigureAwait(false);
+        db.RemoveRange(ownPairData);
+        db.RemoveRange(otherPairData);
+        db.RemoveRange(pairPerms);
+
+        // Process removal of sanctioned group stuff
+        var joinedSanctions = await db.SanctionPairs.Include(s => s.Sanction).Where(u => u.SanctionUserUID == user.UID).ToListAsync().ConfigureAwait(false);
+        foreach (var joinedSG in joinedSanctions)
+        {
+            var isOwner = string.Equals(joinedSG.Sanction.OwnerUID, user.UID, StringComparison.Ordinal);
+            // If the owner of this sanction, them bomb it
+            if (isOwner)
+            {
+                // Obtain all other pairs in that sanctionGroup, then remove them all
+                var otherUsers = await db.SanctionPairs.Where(s => s.SanctionID == joinedSG.SanctionID && s.SanctionUserUID != user.UID).ToListAsync().ConfigureAwait(false);
+                if (!otherUsers.Any())
+                {
+                    // Bomb the group, since nobody else is there
+                    db.SanctionedGroups.Remove(joinedSG.Sanction);
+                }
+                else
+                {
+                    db.SanctionPairs.RemoveRange(otherUsers);
+                    db.SanctionedGroups.Remove(joinedSG.Sanction);
+                }
+            }
+            // remove our own saction pair entry.
+            db.SanctionPairs.Remove(joinedSG);
+        }
+
+        if (globals is not null) db.Remove(globals);
+        if (userProfileData is not null) db.Remove(userProfileData);
+
+        await db.SaveChangesAsync().ConfigureAwait(false);
 
         // now that everything is finally gone, remove the auth & user.
-        dbContext.Remove(auth);
-        dbContext.Remove(user);
-        await dbContext.SaveChangesAsync().ConfigureAwait(false);
+        db.Remove(auth);
+        db.Remove(user);
+        await db.SaveChangesAsync().ConfigureAwait(false);
 
         if (metrics is not null) metrics.IncCounter(MetricsAPI.CounterDeletedVerifiedUsers);
         return pairedUids.ToList();
@@ -120,6 +155,7 @@ public static class SharedDbFunctions
         // Create all other necessary tables for the user now that it is added successfully.
         await dbContext.UserGlobalPerms.AddAsync(new GlobalPermissions { UserUID = user.UID }).ConfigureAwait(false);
         await dbContext.UserProfileData.AddAsync(new UserProfileData { UserUID = user.UID }).ConfigureAwait(false);
+        await dbContext.SanctionOwnerships.AddAsync(new SanctionOwnership { UserUID = user.UID }).ConfigureAwait(false);
 
         logger.LogInformation($"[User {user.UID} (Alias: {user.Alias}) <{user.Tier}>] was created along with other necessary table entries!");
         await dbContext.SaveChangesAsync().ConfigureAwait(false);
@@ -143,6 +179,7 @@ public static class SharedDbFunctions
         // Create all other necessary tables for the user now that it is added successfully.
         await dbContext.UserGlobalPerms.AddAsync(new GlobalPermissions { UserUID = user.UID }).ConfigureAwait(false);
         await dbContext.UserProfileData.AddAsync(new UserProfileData { UserUID = user.UID }).ConfigureAwait(false);
+        await dbContext.SanctionOwnerships.AddAsync(new SanctionOwnership { UserUID = user.UID }).ConfigureAwait(false);
 
         logger.LogInformation($"[User {user.UID} (Alias: {user.Alias}) <{user.Tier}>] was created along with other necessary table entries!");
         await dbContext.SaveChangesAsync().ConfigureAwait(false);

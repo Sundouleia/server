@@ -36,7 +36,7 @@ public partial class SundouleiaHub
         // Sort the following calls by estimated tables with least entries to most entries for efficiency.
 
         // Prevent sending a request if either end has blocked the other.
-        if (await DbContext.BlockedUsers.AnyAsync(p => (p.UserUID == UserUID && p.OtherUserUID == target.UID) || (p.UserUID == target.UID && p.OtherUserUID == UserUID)).ConfigureAwait(false))
+        if (await DbContext.BlacklistedUsers.AnyAsync(p => (p.UserUID == UserUID && p.BlockedUserUID == target.UID) || (p.UserUID == target.UID && p.BlockedUserUID == UserUID)).ConfigureAwait(false))
             return HubResponseBuilder.AwDangIt<SundesmoRequest>(SundouleiaApiEc.RecipientBlocked);
 
         // Ensure that the request does not already exist in the database.
@@ -709,17 +709,17 @@ public partial class SundouleiaHub
             return HubResponseBuilder.AwDangIt(SundouleiaApiEc.InvalidRecipient);
 
         // ensure the entry does not yet exist already.
-        if (await DbContext.BlockedUsers.AsNoTracking().AnyAsync(b => b.UserUID == UserUID && b.OtherUserUID == target.UID).ConfigureAwait(false))
+        if (await DbContext.BlacklistedUsers.AsNoTracking().AnyAsync(b => b.UserUID == UserUID && b.BlockedUserUID == target.UID).ConfigureAwait(false))
             return HubResponseBuilder.AwDangIt(SundouleiaApiEc.RecipientBlocked);
 
         // Create the block entry.
         var callerUser = await DbContext.Users.SingleAsync(u => u.UID == UserUID).ConfigureAwait(false);
-        var blockEntry = new BlockedUser()
+        var blockEntry = new BlacklistedUser()
         {
             User = callerUser,
-            OtherUser = target,
+            BlockedUser = target,
         };
-        await DbContext.BlockedUsers.AddAsync(blockEntry).ConfigureAwait(false);
+        await DbContext.BlacklistedUsers.AddAsync(blockEntry).ConfigureAwait(false);
         await DbContext.SaveChangesAsync().ConfigureAwait(false);
         _metrics.IncCounter(MetricsAPI.CounterUsersBlocked);
         return HubResponseBuilder.Yippee();
@@ -736,11 +736,11 @@ public partial class SundouleiaHub
             return HubResponseBuilder.AwDangIt(SundouleiaApiEc.InvalidRecipient);
 
         // Blocked Entry must exist.
-        if (await DbContext.BlockedUsers.AsNoTracking().SingleOrDefaultAsync(b => b.UserUID == UserUID && b.OtherUserUID == user.User.UID).ConfigureAwait(false) is not { } blockEntry)
+        if (await DbContext.BlacklistedUsers.AsNoTracking().SingleOrDefaultAsync(b => b.UserUID == UserUID && b.BlockedUserUID == user.User.UID).ConfigureAwait(false) is not { } blockEntry)
             return HubResponseBuilder.AwDangIt(SundouleiaApiEc.InvalidRecipient);
 
         // Remove the entry and save changes.
-        DbContext.BlockedUsers.Remove(blockEntry);
+        DbContext.BlacklistedUsers.Remove(blockEntry);
         await DbContext.SaveChangesAsync().ConfigureAwait(false);
         _metrics.IncCounter(MetricsAPI.CounterUsersUnblocked);
         return HubResponseBuilder.Yippee();

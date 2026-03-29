@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace SundouleiaShared.Models;
 
@@ -10,12 +11,14 @@ public class PairRequest
 {
     // User that sent the request to add OtherUser.
     [Key]
+    [Column(Order = 0)]
     [MaxLength(10)]
     public string UserUID { get; set; }
     public User User { get; set; }
 
     // The target user of this request.
     [Key]
+    [Column(Order = 1)]
     [MaxLength(10)]
     public string OtherUserUID { get; set; }
     public User OtherUser { get; set; }
@@ -37,3 +40,6 @@ public class PairRequest
     public ushort FromWorldId { get; set; } = 0;
     public ushort FromZoneId { get; set; } = 0;
 }
+
+// Update this later to help reflect if the requests that we get are for
+// radar pairs or direct pairs, since they are seprate things.

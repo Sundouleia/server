@@ -291,7 +291,7 @@ public partial class SundouleiaHub
         var query = from u in DbContext.Users.AsNoTracking()
                     where targets.Contains(u.UID) || targets.Contains(u.Alias)
                     // Deny if blocked
-                    where !DbContext.BlockedUsers.AsNoTracking().Any(b => (b.UserUID == UserUID && b.OtherUserUID == u.UID) || (b.UserUID == u.UID && b.OtherUserUID == UserUID))
+                    where !DbContext.BlacklistedUsers.AsNoTracking().Any(b => (b.UserUID == UserUID && b.BlockedUserUID == u.UID) || (b.UserUID == u.UID && b.BlockedUserUID == UserUID))
                     // Deny if exists
                     where !DbContext.Requests.AsNoTracking().Any(r => (r.UserUID == UserUID && r.OtherUserUID == u.UID) || (r.UserUID == u.UID && r.OtherUserUID == UserUID))
                     // Deny if paired
