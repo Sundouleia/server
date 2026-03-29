@@ -47,7 +47,7 @@ public class UserRequirementHandler : AuthorizationHandler<UserRequirement, HubI
             // Get the UID from the context claim
             string uid = context.User.Claims.SingleOrDefault(g => string.Equals(g.Type, SundouleiaClaimTypes.Uid, StringComparison.Ordinal))?.Value;
             // if the UID is null, fail the context
-            //_logger.LogInformation("SundouleiaHub:UID: {uid}", uid);
+            //_logger.LogInformation("UID: {uid}", uid);
 
             if (uid is null)
                 context.Fail();
@@ -55,7 +55,7 @@ public class UserRequirementHandler : AuthorizationHandler<UserRequirement, HubI
 
             //_logger.LogInformation("Fetching ident from Redis");
 
-            // ar ident = await _redis.GetAsync<string>("SundouleiaHub:UID:" + uid).ConfigureAwait(false);
+            // ar ident = await _redis.GetAsync<string>("UID:" + uid).ConfigureAwait(false);
             string ident = await _redis.GetAsync<string>("UID:" + uid).ConfigureAwait(false);
             if (ident == RedisValue.EmptyString)
                 context.Fail();

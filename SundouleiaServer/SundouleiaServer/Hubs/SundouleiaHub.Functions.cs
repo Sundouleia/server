@@ -59,7 +59,7 @@ public partial class SundouleiaHub
     private async Task<Dictionary<string, string>> GetOnlineUsers(IEnumerable<string> uids)
     {
         var result = await _redis.GetAllAsync<string>(uids.Select(u => "UID:" + u).ToHashSet(StringComparer.Ordinal)).ConfigureAwait(false);
-        return uids.Where(u => result.TryGetValue("UID:" + u, out var ident) && !string.IsNullOrEmpty(ident)).ToDictionary(u => u, u => result[":UID:" + u], StringComparer.Ordinal);
+        return uids.Where(u => result.TryGetValue("UID:" + u, out var ident) && !string.IsNullOrEmpty(ident)).ToDictionary(u => u, u => result["UID:" + u], StringComparer.Ordinal);
     }
 
     /// <summary>
