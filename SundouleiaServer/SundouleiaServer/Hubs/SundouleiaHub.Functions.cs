@@ -1,7 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SundouleiaAPI.Data;
-using SundouleiaAPI.Enums;
-using SundouleiaAPI.Network;
 using SundouleiaShared.Models;
 using SundouleiaShared.Utils;
 
@@ -17,6 +15,7 @@ public partial class SundouleiaHub
     public string UserUID => Context.User?.Claims?.SingleOrDefault(c => string.Equals(c.Type, SundouleiaClaimTypes.Uid, StringComparison.Ordinal))?.Value ?? throw new Exception("No UID in Claims");
     public string UserHasTempAccess => Context.User?.Claims?.SingleOrDefault(c => string.Equals(c.Type, SundouleiaClaimTypes.AccessType, StringComparison.Ordinal))?.Value ?? throw new Exception("No TempAccess in Claims");
 
+    #region Filehost Helpers
     /// <summary>
     ///     Requests the file download links from the file host for the specified mod files. <para />
     ///     The FileHost will return download links for any that exist, and authorized upload links for those that do not. <para />
@@ -41,6 +40,7 @@ public partial class SundouleiaHub
         // return the record containing the resulting lists.
         return new(validMods, requiresUpload);
     }
+    #endregion Filehost Helpers
 
 
     /// <summary>
@@ -56,10 +56,10 @@ public partial class SundouleiaHub
     /// <summary>
     ///     Helper to get the total number of users who are online currently from the list of passed in UID's.
     /// </summary>
-    private async Task<Dictionary<string, string>> GetOnlineUsers(List<string> uids)
+    private async Task<Dictionary<string, string>> GetOnlineUsers(IEnumerable<string> uids)
     {
-        var result = await _redis.GetAllAsync<string>(uids.Select(u => "SundouleiaHub:UID:" + u).ToHashSet(StringComparer.Ordinal)).ConfigureAwait(false);
-        return uids.Where(u => result.TryGetValue("SundouleiaHub:UID:" + u, out var ident) && !string.IsNullOrEmpty(ident)).ToDictionary(u => u, u => result["SundouleiaHub:UID:" + u], StringComparer.Ordinal);
+        var result = await _redis.GetAllAsync<string>(uids.Select(u => "UID:" + u).ToHashSet(StringComparer.Ordinal)).ConfigureAwait(false);
+        return uids.Where(u => result.TryGetValue("UID:" + u, out var ident) && !string.IsNullOrEmpty(ident)).ToDictionary(u => u, u => result[":UID:" + u], StringComparer.Ordinal);
     }
 
     /// <summary>
@@ -68,7 +68,7 @@ public partial class SundouleiaHub
     private async Task<string?> GetUserIdent(string uid)
     {
         if (string.IsNullOrEmpty(uid)) return string.Empty;
-        return await _redis.GetAsync<string>("SundouleiaHub:UID:" + uid).ConfigureAwait(false);
+        return await _redis.GetAsync<string>("UID:" + uid).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -76,7 +76,7 @@ public partial class SundouleiaHub
     /// </summary>
     private async Task RemoveUserFromRedis()
     {
-        await _redis.RemoveAsync("SundouleiaHub:UID:" + UserUID, StackExchange.Redis.CommandFlags.FireAndForget).ConfigureAwait(false);
+        await _redis.RemoveAsync("UID:" + UserUID, StackExchange.Redis.CommandFlags.FireAndForget).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -84,7 +84,7 @@ public partial class SundouleiaHub
     /// </summary>
     private async Task UpdateUserOnRedis()
     {
-        await _redis.AddAsync("SundouleiaHub:UID:" + UserUID, UserCharaIdent, TimeSpan.FromSeconds(60),
+        await _redis.AddAsync("UID:" + UserUID, UserCharaIdent, TimeSpan.FromSeconds(60),
             StackExchange.Redis.When.Always, StackExchange.Redis.CommandFlags.FireAndForget).ConfigureAwait(false);
     }
 
@@ -210,10 +210,13 @@ public partial class SundouleiaHub
                             select new
                             {
                                 UserUID = user.UserUID,
-                                OtherUserUID = user.OtherUserUID,
-                                OtherUserAlias = u.Alias,
-                                OtherUserTier = u.Tier,
-                                OtherUserCreatedDate = u.CreatedAt,
+                                OtherUID = user.OtherUserUID,
+                                OtherAlias = u.Alias,
+                                OtherDispName = u.DisplayName,
+                                OtherColor = u.NameColor,
+                                OtherGlow = u.NameGlowColor,
+                                OtherTier = u.Tier,
+                                OtherCreatedDate = u.CreatedAt,
                                 OwnGlobalPerms = userGlobalPerm,
                                 OwnPermissions = ownperm,
                                 OtherGlobalPerms = otherUserGlobalPerm,
@@ -223,21 +226,29 @@ public partial class SundouleiaHub
                             };
 
         // Get final query result using no tracking.
-        var resultList = await resultingInfo.AsNoTracking().ToListAsync().ConfigureAwait(false);
-        if (resultList.Count == 0)
+        var res = await resultingInfo.AsNoTracking().ToListAsync().ConfigureAwait(false);
+        if (res.Count is 0)
             return null;
+
+        var resUserDat = new UserData(
+            res[0].OtherUID,
+            res[0].OtherAlias,
+            res[0].OtherDispName,
+            res[0].OtherColor,
+            res[0].OtherGlow,
+            res[0].OtherTier,
+            res[0].OtherCreatedDate
+        );
 
         // Construct and return the UserInfo object.
         return new UserInfo(
-            resultList[0].OtherUserAlias,
-            resultList[0].OtherUserTier,
-            resultList[0].OtherUserCreatedDate,
-            resultList[0].OwnGlobalPerms,
-            resultList[0].OwnPermissions,
-            resultList[0].OtherGlobalPerms,
-            resultList[0].OtherPermissions,
-            resultList[0].InitializedAt,
-            resultList[0].TempAccepter
+            resUserDat,
+            res[0].OwnGlobalPerms,
+            res[0].OwnPermissions,
+            res[0].OtherGlobalPerms,
+            res[0].OtherPermissions,
+            res[0].InitializedAt,
+            res[0].TempAccepter
         );
     }
 
@@ -313,6 +324,41 @@ public partial class SundouleiaHub
         return requestsList.ToDictionary(x => x.TargetUid, x => x.Request, StringComparer.Ordinal);
     }
 
+
+    // --- Prototype, untested model --- 
+    //private async Task<Dictionary<string, UserInfo>> GetAllPairInfo(string uid)
+    //{
+    //    // Directly join everything and project into DTOs
+    //    var query =
+    //        from cp in DbContext.ClientPairs.AsNoTracking().Where(c => c.UserUID == uid)
+    //        join u in DbContext.Users.AsNoTracking() on cp.OtherUserUID equals u.UID
+    //        join own in DbContext.ClientPairPerms.AsNoTracking().Where(p => p.UserUID == uid)
+    //            on new { cp.UserUID, cp.OtherUserUID } equals new { own.UserUID, own.OtherUserUID }
+    //            into ownPerms
+    //        from ownperm in ownPerms.DefaultIfEmpty()
+    //        join other in DbContext.ClientPairPerms.AsNoTracking().Where(p => p.OtherUserUID == uid)
+    //            on new { cp.UserUID, cp.OtherUserUID } equals new { UserUID = other.OtherUserUID, OtherUserUID = other.UserUID }
+    //            into otherPerms
+    //        from otherperm in otherPerms.DefaultIfEmpty()
+    //        join ug in DbContext.UserGlobalPerms.AsNoTracking() on cp.UserUID equals ug.UserUID into userGlobalPerms
+    //        from userGlobalPerm in userGlobalPerms.DefaultIfEmpty()
+    //        join oug in DbContext.UserGlobalPerms.AsNoTracking() on cp.OtherUserUID equals oug.UserUID into otherUserGlobalPerms
+    //        from otherUserGlobalPerm in otherUserGlobalPerms.DefaultIfEmpty()
+    //        select new UserInfo(
+    //            new UserData(u.UID, u.Alias, u.DisplayName, u.NameColor, u.NameGlowColor, u.Tier, u.CreatedAt),
+    //            userGlobalPerm,
+    //            ownperm,
+    //            otherUserGlobalPerm,
+    //            otherperm,
+    //            cp.CreatedAt,
+    //            cp.TempAccepterUID
+    //        );
+    //    var list = await query.ToListAsync().ConfigureAwait(false);
+    //    // Dictionary keyed by OtherUserUID
+    //    return list.ToDictionary(info => info.UserData.UID, info => info, StringComparer.Ordinal);
+    //}
+
+
     /// <summary>
     ///     Helper function to retrieve the UserInfo's for ALL pairs of a specific UID. <para />
     ///     Does not care about pause status.
@@ -383,9 +429,12 @@ public partial class SundouleiaHub
                             {
                                 UserUID = user.UserUID,
                                 OtherUserUID = user.OtherUserUID,
-                                OtherUserAlias = u.Alias,
-                                OtherUserVanity = u.Tier,
-                                OtherUserCreatedDate = u.CreatedAt,
+                                OtherAlias = u.Alias,
+                                OtherDispName = u.DisplayName,
+                                OtherColor = u.NameColor,
+                                OtherGlow = u.NameGlowColor,
+                                OtherTier = u.Tier,
+                                OtherCreatedDate = u.CreatedAt,
                                 OwnGlobalPerms = userGlobalPerm,
                                 OwnPermissions = ownperm,
                                 OtherGlobalPerms = otherUserGlobalPerm,
@@ -397,25 +446,32 @@ public partial class SundouleiaHub
         // obtain the query result and form it into an established list
         var resultList = await resultingInfo.AsNoTracking().ToListAsync().ConfigureAwait(false);
 
-
         // Group results by OtherUserUID and convert to dictionary for return
-        return resultList.GroupBy(g => g.OtherUserUID, StringComparer.Ordinal).ToDictionary(g => g.Key, g =>
-        {
-            // for some unexplainable reason, putting a return where the var is makes this no longer work.
-            // I dont fucking know why, it just doesn't.
-            var userInfo = new UserInfo(
-                g.First().OtherUserAlias,
-                g.First().OtherUserVanity,
-                g.First().OtherUserCreatedDate,
-                g.First().OwnGlobalPerms,
-                g.First().OwnPermissions,
-                g.First().OtherGlobalPerms,
-                g.First().OtherPermissions,
-                g.First().InitializedAt,
-                g.First().TempAccepter
-            );
-            return userInfo;
-        }, StringComparer.Ordinal);
+        return resultList
+            .GroupBy(g => g.OtherUserUID, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g =>
+            {
+                var first = g.First();
+                var userData = new UserData(
+                    first.OtherUserUID,
+                    first.OtherAlias,
+                    first.OtherDispName,
+                    first.OtherColor,
+                    first.OtherGlow,
+                    first.OtherTier,
+                    first.OtherCreatedDate
+                );
+                var userInfo = new UserInfo(
+                    userData,
+                    first.OwnGlobalPerms,
+                    first.OwnPermissions,
+                    first.OtherGlobalPerms,
+                    first.OtherPermissions,
+                    first.InitializedAt,
+                    first.TempAccepter
+                );
+                return userInfo;
+            }, StringComparer.Ordinal);
     }
 
     /// <summary>
@@ -477,7 +533,7 @@ public partial class SundouleiaHub
 
     public record RequestInfo(PairRequest Request, User Sender, GlobalPermissions SenderGlobals, GlobalPermissions RecipientGlobals);
 
-    public record UserInfo(string Alias, CkVanityTier Tier, DateTime Created, GlobalPermissions OwnGlobals, ClientPairPermissions OwnPerms, 
+    public record UserInfo(UserData UserData, GlobalPermissions OwnGlobals, ClientPairPermissions OwnPerms, 
         GlobalPermissions OtherGlobals, ClientPairPermissions OtherPerms, DateTime PairInitAt, string PairTempAccepter);
 }
 #pragma warning restore MA0016

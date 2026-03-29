@@ -7,6 +7,8 @@ using SundouleiaAPI.Network;
 using SundouleiaServer.Utils;
 using SundouleiaShared.Metrics;
 using SundouleiaShared.Models;
+using SundouleiaShared.Utils;
+using System.Text.Json;
 
 namespace SundouleiaServer.Hubs;
 
@@ -87,18 +89,16 @@ public partial class SundouleiaHub
         {
             Kind = ReportKind.Radar,
             ReportTime = DateTime.UtcNow,
+            // All that is needed for a radarGroup report.
             WorldId = dto.WorldId,
             TerritoryId = dto.TerritoryId,
             
-            RecentRadarChatHistory = string.Empty,
+            ChatLogId = string.Empty,
+            MessageId = string.Empty,
+            Message = string.Empty,
+            ChatContextJson = string.Empty,
+            
             ReportedUserUID = string.Empty,
-
-            IsIndoor = dto.IsIndoor,
-            ApartmentDivision = dto.IsIndoor ? dto.ApartmentDivision : (byte)0,
-            PlotIndex = dto.IsIndoor ? dto.PlotIndex : (byte)0,
-            WardIndex = dto.IsIndoor ? dto.WardIndex : (byte)0,
-            RoomNumber = dto.IsIndoor ? dto.RoomNumber : (byte)0,
-
             ReporterUID = UserUID,
             ReportReason = dto.ReportReason,
         };
@@ -129,48 +129,39 @@ public partial class SundouleiaHub
         }
 
         // Prevent duplicate reports.
-        if (await DbContext.RadarReports.AsNoTracking().AnyAsync(r => r.WorldId == dto.WorldId && r.TerritoryId == r.TerritoryId && r.Kind == ReportKind.Chat).ConfigureAwait(false))
+        if (await DbContext.RadarReports.AsNoTracking().AnyAsync(r => r.ChatLogId == dto.Chatlog.ChatId && r.MessageId == dto.MessageId && r.Kind == ReportKind.Chat).ConfigureAwait(false))
         {
-            await Clients.Caller.Callback_ServerMessage(MessageSeverity.Error, "This Radar zone is already under investigation.").ConfigureAwait(false);
+            await Clients.Caller.Callback_ServerMessage(MessageSeverity.Error, "This RadarChat is already under investigation.").ConfigureAwait(false);
             return HubResponseBuilder.AwDangIt(SundouleiaApiEc.AlreadyReported);
         }
 
+        // Collect up the server-authorized chat messages
+        var serverChatHistory = _chatService.GetMessageHistory(dto.Chatlog.ChatId, 25);
+        var toSerialize = serverChatHistory
+            .Select(m => new JsonChatMsg(m.MsgId, m.TimeSentUTC, m.Sender.UID, m.Sender.DisplayName, m.Message))
+            .ToArray();
+
+        var snapshotJson = JsonSerializer.Serialize(toSerialize, new JsonSerializerOptions(JsonSerializerDefaults.General) { WriteIndented = false });
         // Report is valid, so construct the report to send off.
         var reportToAdd = new ReportedRadar()
         {
             Kind = ReportKind.Chat,
             ReportTime = DateTime.UtcNow,
-            WorldId = dto.WorldId,
-            TerritoryId = dto.TerritoryId,
-            // If people make fake chat log histories we can always just cache the recent history
-            // from the various groups and regurgitate them for snapshots in the reports.
-            RecentRadarChatHistory = dto.ChatCompressed,
+            WorldId = 0,
+            TerritoryId = 0,
+            ChatLogId = dto.Chatlog.ChatId,
+            MessageId = dto.MessageId,
+            Message = toSerialize.FirstOrDefault(m => string.Equals(m.MsgId, dto.MessageId, StringComparison.Ordinal)).Message ?? string.Empty,
+            ChatContextJson = snapshotJson,
             ReportedUserUID = dto.User.UID,
-
-            IsIndoor = dto.IsIndoor,
-            ApartmentDivision = dto.IsIndoor ? dto.ApartmentDivision : (byte)0,
-            PlotIndex = dto.IsIndoor ? dto.PlotIndex : (byte)0,
-            WardIndex = dto.IsIndoor ? dto.WardIndex : (byte)0,
-            RoomNumber = dto.IsIndoor ? dto.RoomNumber : (byte)0,
-
+            
             ReporterUID = UserUID,
-
-            ReportReason = dto.ReportReason,
+            ReportReason = dto.Reason,
         };
         await DbContext.RadarReports.AddAsync(reportToAdd).ConfigureAwait(false);
         
         // Inform the reporter that the report was successful.
         await Clients.Caller.Callback_ServerMessage(MessageSeverity.Information, "Your Report was processed, and now pending validation from CK").ConfigureAwait(false);
-
-        // In the case that the reported user was being vulgar in chat, we will want to clear all messages sent by this user.
-        // To do so, run a callback to all users in this group.
-        var reportedChatGroup = _radarService.GetGroupName(dto.WorldId, dto.TerritoryId);
-        // This will also inform the reported user, helping them know they disconnected.
-        await Clients.Group(reportedChatGroup).Callback_RadarUserFlagged(dto.User.UID).ConfigureAwait(false);
-
-        // Remove the reported user from the chat group, preventing them from getting any further messages.
-        if (_userConnections.TryGetValue(dto.User.UID, out string connectionId) && _radarService.IsInChat(connectionId))
-            await _radarService.LeaveRadarChat(connectionId).ConfigureAwait(false);
 
         // Disable chat for the reported user until it is resolved.
         auth.AccountRep.ChatUsage = false;

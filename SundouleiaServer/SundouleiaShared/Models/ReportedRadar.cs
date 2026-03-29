@@ -5,8 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace SundouleiaShared.Models;
 
 /// <summary>
-///     In the case that a radar is being exploited for purposes it is not made for,
-///     they can be reported here.
+///   Stores reports for radar group and radar chat misconduct.
 /// </summary>
 public class ReportedRadar
 {
@@ -17,20 +16,18 @@ public class ReportedRadar
     // Require knowing what kind of radar report this is, the time it was made, and what territory it is in.
     [Required] public ReportKind Kind { get; set; } = ReportKind.Radar;
     [Required] public DateTime ReportTime { get; set; }
+
+    // Only need to know worldId and TerritoryId for radar reports. Doesnt madder for chat since we have chatlogId
     [Required] public ushort WorldId { get; set; }
     [Required] public ushort TerritoryId { get; set; }
 
-    // If the reported type was chat, a compressed string of the latest chat history
-    // can be collected here, along with the reported UserUID.
-    public string RecentRadarChatHistory { get; set; } = string.Empty;
-    public string ReportedUserUID { get; set; } = string.Empty;
+    // Unique to chat reports
+    public string ChatLogId { get; set; } = string.Empty;
+    public string MessageId { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public string ChatContextJson { get; set; } = string.Empty;
 
-    // Additional information about where if the territory was indoors. Not set if outdoors.
-    public bool IsIndoor { get; set; } = false;
-    public byte ApartmentDivision { get; set; }
-    public byte PlotIndex { get; set; }
-    public byte WardIndex { get; set; }
-    public byte RoomNumber { get; set; }
+    public string ReportedUserUID { get; set; } = string.Empty;
 
     // Reporter.
     [ForeignKey(nameof(Reporter))]

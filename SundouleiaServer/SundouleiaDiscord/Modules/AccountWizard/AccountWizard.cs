@@ -230,7 +230,7 @@ public partial class AccountWizard : InteractionModuleBase
     {
         ulong discordId = Context.User.Id;                                                // Get the Discord ID of the current user
 
-        AccountClaimAuth existingAuth = await sundouleiaDb.AccountClaimAuth.Include(u => u.User)       // then fetch the existing auth for the primary user
+        var existingAuth = await sundouleiaDb.AccountClaimAuth.Include(u => u.User)       // then fetch the existing auth for the primary user
             .SingleOrDefaultAsync(e => e.DiscordId == discordId).ConfigureAwait(false); // where accountClaimAuth's discord ID matches interacting discord user ID
 
         // If there is an existing authorization, we have found a primary user to generate secondary users for.
@@ -281,7 +281,7 @@ public partial class AccountWizard : InteractionModuleBase
         var hashedKey = BitConverter.ToString(sha256.ComputeHash(Encoding.UTF8.GetBytes(initialGeneratedKey))).Replace("-", "", StringComparison.Ordinal);
 
         // Create the AccountClaimAuth object
-        AccountClaimAuth accountClaimAuthToAdd = new AccountClaimAuth()
+        var accountClaimAuthToAdd = new AccountClaimAuth()
         {
             DiscordId = discordId,
             InitialGeneratedKey = hashedKey,

@@ -56,7 +56,7 @@ public class UserRequirementHandler : AuthorizationHandler<UserRequirement, HubI
             //_logger.LogInformation("Fetching ident from Redis");
 
             // ar ident = await _redis.GetAsync<string>("SundouleiaHub:UID:" + uid).ConfigureAwait(false);
-            string ident = await _redis.GetAsync<string>("SundouleiaHub:UID:" + uid).ConfigureAwait(false);
+            string ident = await _redis.GetAsync<string>("UID:" + uid).ConfigureAwait(false);
             if (ident == RedisValue.EmptyString)
                 context.Fail();
         }

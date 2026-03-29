@@ -596,7 +596,7 @@ public class SundouleiaCommands : InteractionModuleBase
         Auth? auth = await db.Auth.Include(u => u.PrimaryUser).SingleOrDefaultAsync(u => u.UserUID == dbUser.UID).ConfigureAwait(false);
 
         // Fetch the identity from the database.
-        RedisValue identity = await _multiplexer.GetDatabase().StringGetAsync("SundouleiaHub:UID:" + dbUser.UID).ConfigureAwait(false);
+        RedisValue identity = await _multiplexer.GetDatabase().StringGetAsync("UID:" + dbUser.UID).ConfigureAwait(false);
 
         // Set the title and description of the embed builder.
         eb.WithTitle("User Information");

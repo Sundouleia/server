@@ -3,11 +3,7 @@ using Discord.Rest;
 using Discord.WebSocket;
 using Microsoft.EntityFrameworkCore;
 using SundouleiaShared.Data;
-using SundouleiaShared.Services;
 using System.Collections.Concurrent;
-using System.Globalization;
-using System.Text;
-using DiscordConfig = SundouleiaShared.Utils.Configuration.DiscordConfig;
 
 // namespace dedicated to the discord bot.
 namespace SundouleiaDiscord;

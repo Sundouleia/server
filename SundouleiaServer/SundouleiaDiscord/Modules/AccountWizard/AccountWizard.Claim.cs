@@ -6,11 +6,8 @@ using SundouleiaAPI.Enums;
 using SundouleiaAPI.Hub;
 using SundouleiaDiscord.Modules.Popups;
 using SundouleiaShared.Data;
-using SundouleiaShared.Utils;
-using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using DiscordConfig = SundouleiaShared.Utils.Configuration.DiscordConfig;
 
 namespace SundouleiaDiscord.Modules.AccountWizard;
@@ -265,6 +262,12 @@ public partial class AccountWizard
         // Everything is valid, so change values in the table entries.
         _logger.LogInformation($"Verification ({verificationModal.VerificationCodeStr}) matched generated code for: ({Context.User.Id})");
         _botServices.DiscordVerifiedUsers[Context.User.Id] = true;
+
+        // Just before we update this auth claim, we want to make sure we remove any other existing auth claims from this user, as there may have been a recovered account.
+        // This is ok because right now this claimed auth does not have a user assigned.
+        var existingClaims = await dbContext.AccountClaimAuth.Where(c => c.User != null && c.User.UID == user.UID).ToListAsync().ConfigureAwait(false);
+        if (existingClaims.Count > 0)
+            dbContext.AccountClaimAuth.RemoveRange(existingClaims);
 
         // Clear code, key, (and started at, as cleanup service removes all non-null startedAt items).
         authClaim.InitialGeneratedKey = null;

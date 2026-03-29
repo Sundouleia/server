@@ -173,7 +173,7 @@ public class JwtController : Controller
             }
 
             // If they are not yet disconnected from the redis database, do not authenticate a duplicate.
-            if (!string.IsNullOrEmpty(await _redis.GetAsync<string>("SundouleiaHub:UID:" + authResult.Uid)))
+            if (!string.IsNullOrEmpty(await _redis.GetAsync<string>("UID:" + authResult.Uid)))
             {
                 _logger.LogWarning($"Authenticate:DUPLICATE:{authResult.Uid}:{charaIdent}");
                 return Unauthorized("Already logged in to this account. Reconnect in 60 seconds. If you keep seeing this issue, restart your game.");

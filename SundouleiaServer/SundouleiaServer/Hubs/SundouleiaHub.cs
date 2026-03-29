@@ -27,7 +27,7 @@ public partial class SundouleiaHub : Hub<ISundouleiaHub>, ISundouleiaHub
     // Loggers and services.
     private readonly SundouleiaHubLogger _logger;
     private readonly SundouleiaMetrics _metrics;
-    private readonly RadarService _radarService;
+    private readonly RadarChatService _chatService;
     private readonly SystemInfoService _systemInfoService;
     private readonly IHttpContextAccessor _contextAccessor;
     private readonly IRedisDatabase _redis;
@@ -45,7 +45,7 @@ public partial class SundouleiaHub : Hub<ISundouleiaHub>, ISundouleiaHub
         IDbContextFactory<SundouleiaDbContext> dbFactory,
         IConfigurationService<ServerConfiguration> config,
         SundouleiaMetrics metrics,
-        RadarService radarService,
+        RadarChatService radarService,
         SystemInfoService systemInfoService,
         IRedisDatabase redis,
         IHttpContextAccessor contextAccessor,
@@ -53,7 +53,7 @@ public partial class SundouleiaHub : Hub<ISundouleiaHub>, ISundouleiaHub
     {
         _logger = new SundouleiaHubLogger(this, logger);
         _metrics = metrics;
-        _radarService = radarService;
+        _chatService = radarService;
         _systemInfoService = systemInfoService;
         _redis = redis;
         _contextAccessor = contextAccessor;
@@ -213,8 +213,6 @@ public partial class SundouleiaHub : Hub<ISundouleiaHub>, ISundouleiaHub
         {
             _logger.LogCallInfo(SundouleiaHubLogger.Args(_contextAccessor.GetIpAddress(), "UpdatingId", oldId, Context.ConnectionId));
             _userConnections[UserUID] = Context.ConnectionId;
-            // Leave their existing group chat if in any.
-            await _radarService.LeaveRadarChat(oldId).ConfigureAwait(false);
         }
         // otherwise, attempt establishing a new connection.
         else
@@ -230,12 +228,7 @@ public partial class SundouleiaHub : Hub<ISundouleiaHub>, ISundouleiaHub
             }
             catch
             {
-                // if at any point we catch an error, then remove the user from the concurrent dictionary of user connections.
-
-                await _radarService.LeaveRadarChat(Context.ConnectionId).ConfigureAwait(false);
-                // double check just to be safe.
                 _userConnections.Remove(UserUID, out string removedId);
-                await _radarService.LeaveRadarChat(removedId).ConfigureAwait(false);
             }
         }
         await base.OnConnectedAsync().ConfigureAwait(false);
@@ -267,9 +260,13 @@ public partial class SundouleiaHub : Hub<ISundouleiaHub>, ISundouleiaHub
                 if (exception is not null)
                     _logger.LogCallWarning(SundouleiaHubLogger.Args(_contextAccessor.GetIpAddress(), Context.ConnectionId, exception.Message, exception.StackTrace ?? string.Empty));
 
-                // Remove from the redis database and send offline to all of their pairs.
+                // Clear the user off redis
                 await RemoveUserFromRedis().ConfigureAwait(false);
-                await RadarZoneLeave().ConfigureAwait(false);
+
+                // Update their location to offline, effectively wiping their location off the map.
+                await RemoveUserLocation().ConfigureAwait(false);
+
+                // Send that we went offline to all pairs.
                 await SendOfflineToAllPairedUsers().ConfigureAwait(false);
             }
             catch { /* Consume */ }
@@ -277,7 +274,6 @@ public partial class SundouleiaHub : Hub<ISundouleiaHub>, ISundouleiaHub
             {
                 // Remove from user connections and any radar chats.
                 _userConnections.Remove(UserUID, out string removedId);
-                await _radarService.LeaveRadarChat(removedId).ConfigureAwait(false);
             }
         }
         // Log warning if a DC happened before we were even properly established in _userConnections.

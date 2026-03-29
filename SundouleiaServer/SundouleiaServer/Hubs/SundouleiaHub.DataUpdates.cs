@@ -170,6 +170,60 @@ public partial class SundouleiaHub
     #endregion Loci
 
     [Authorize(Policy = "Identified")]
+    public async Task<HubResponse> UserSetAlias(AliasUpdate dto)
+    {
+        var newAlias = dto.NewAlias.Trim();
+        if (string.IsNullOrEmpty(newAlias))
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.IncorrectDataType);
+
+        // Ensure the user exists.
+        if (await DbContext.Users.SingleOrDefaultAsync(u => u.UID == UserUID).ConfigureAwait(false) is not { } user)
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NullData);
+
+        // Anyone can set their alias if their user is valid now!
+        user.Alias = newAlias;
+        DbContext.Update(user);
+        await DbContext.SaveChangesAsync().ConfigureAwait(false);
+
+        // Inform others of the changes.
+        var pairsOfCaller = await GetPairedUnpausedUsers().ConfigureAwait(false);
+        var onlinePairsOfCaller = await GetOnlineUsers(pairsOfCaller).ConfigureAwait(false);
+        IEnumerable<string> onlineUids = onlinePairsOfCaller.Keys;
+
+        await Clients.Users(onlineUids).Callback_UserVanityUpdate(new(user.ToUserData())).ConfigureAwait(false);
+        return HubResponseBuilder.Yippee();
+    }
+
+    [Authorize(Policy = "Identified")]
+    public async Task<HubResponse> UserSetVanity(VanityUpdate dto)
+    {
+        var newName = dto.VanityName.Trim();
+        if (string.IsNullOrEmpty(newName))
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.IncorrectDataType);
+
+        // Ensure the user exists.
+        if (DbContext.Users.SingleOrDefault(u => u.UID == UserUID) is not { } user)
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.NullData);
+
+        if (user.Tier is CkVanityTier.NoRole)
+            return HubResponseBuilder.AwDangIt(SundouleiaApiEc.InvalidVanityTier);
+
+        // Update
+        user.DisplayName = newName;
+        user.NameColor = dto.NameColor;
+        user.NameGlowColor = dto.NameGlowColor;
+        DbContext.Update(user);
+        await DbContext.SaveChangesAsync().ConfigureAwait(false);
+
+        // Inform others of the changes.
+        var pairsOfCaller = await GetPairedUnpausedUsers().ConfigureAwait(false);
+        var onlinePairsOfCaller = await GetOnlineUsers(pairsOfCaller).ConfigureAwait(false);
+        IEnumerable<string> onlineUids = onlinePairsOfCaller.Keys;
+        await Clients.Users(onlineUids).Callback_UserVanityUpdate(new(user.ToUserData())).ConfigureAwait(false);
+        return HubResponseBuilder.Yippee();
+    }
+
+    [Authorize(Policy = "Identified")]
     public async Task<HubResponse> UserUpdateProfileContent(ProfileContent dto)
     {
         _logger.LogMessage($"ProfileContentUpdate:{UserUID}");

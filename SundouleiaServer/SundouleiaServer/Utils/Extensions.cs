@@ -57,11 +57,11 @@ public static class Extensions
             DescriptionOverlay = data.DescriptionOverlay
         };
 
-    public static UserData ToUserData(this User user)
-        => new UserData(user.UID, user.Alias, user.Tier, user.CreatedAt);
+    public static UserData ToUserData(this User u)
+        => new(u.UID, u.Alias, u.DisplayName, u.NameColor, u.NameGlowColor, u.Tier, u.CreatedAt);
 
     public static SundesmoRequest ToApi(this PairRequest r)
-        => new SundesmoRequest(new(r.UserUID), new(r.OtherUserUID), new(r.IsTemporary, r.AttachedMessage, r.FromWorldId, r.FromZoneId), r.CreationTime);
+        => new(new(r.UserUID), new(r.OtherUserUID), new(r.IsTemporary, r.AttachedMessage, r.FromWorldId, r.FromZoneId), r.CreationTime);
 
     public static SundesmoRequest ToApiRemoval(UserData user, UserData target) =>
         new(user, target, new(false, string.Empty, 0, 0), DateTime.MinValue);

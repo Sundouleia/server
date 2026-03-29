@@ -24,10 +24,10 @@ public partial class SundouleiaHub
     {
         var pairs = await GetAllPairInfo(UserUID).ConfigureAwait(false);
         // Convert the UserInfo objects returned into UserPair DTO's for transit.
-        return pairs.Select(p =>
+        return [.. pairs.Select(p =>
         {
             var pairDto = new UserPair(
-                new UserData(p.Key, p.Value.Alias, p.Value.Tier, p.Value.Created),
+                p.Value.UserData,
                 p.Value.OwnPerms.ToApi(),
                 p.Value.OtherGlobals.ToApi(),
                 p.Value.OtherPerms.ToApi(),
@@ -35,7 +35,7 @@ public partial class SundouleiaHub
                 p.Value.PairTempAccepter
             );
             return pairDto;
-        }).ToList();
+        }),];
     }
 
     /// <summary>

@@ -22,10 +22,6 @@ public partial class SundouleiaHub
     public Task Callback_AddRequest(SundesmoRequest _) => throw new PlatformNotSupportedException(UnsupportedMessage);
     public Task Callback_RemoveRequest(SundesmoRequest _) => throw new PlatformNotSupportedException(UnsupportedMessage);
 
-    // -- Moderation Utility Callbacks ---
-    public Task Callback_Blocked(UserDto _) => throw new PlatformNotSupportedException(UnsupportedMessage);
-    public Task Callback_Unblocked(UserDto _) => throw new PlatformNotSupportedException(UnsupportedMessage);
-
     // --- Moodles Integration Callbacks ---
     public Task Callback_PairLociDataUpdated(LociDataUpdate _) => throw new PlatformNotSupportedException(UnsupportedMessage);
     public Task Callback_PairLociStatusesUpdate(LociStatusesUpdate _) => throw new PlatformNotSupportedException(UnsupportedMessage);
@@ -48,15 +44,20 @@ public partial class SundouleiaHub
     public Task Callback_ChangeAllUnique(ChangeAllUnique _) => throw new PlatformNotSupportedException(UnsupportedMessage);
 
     // --- Radar Callbacks ---
-    public Task Callback_RadarAddUpdateUser(OnlineUser _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_RadarChatMessage(LoggedRadarChatMessage _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_RadarChatAddUpdateUser(RadarChatMember _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_RadarAddUpdateUser(RadarMember _) => throw new PlatformNotSupportedException(UnsupportedMessage);
     public Task Callback_RadarRemoveUser(UserDto _) => throw new PlatformNotSupportedException(UnsupportedMessage);
-    public Task Callback_RadarChat(RadarChatMessage _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_RadarGroupAddUpdateUser(RadarGroupMember _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_RadarGroupRemoveUser(UserDto _) => throw new PlatformNotSupportedException(UnsupportedMessage);
 
+    public Task Callback_ChatMessageReceived(ReceivedChatMessage _) => throw new PlatformNotSupportedException(UnsupportedMessage);
 
     // --- User Status Update Callbacks ---
     public Task Callback_UserIsUnloading(UserDto _) => throw new PlatformNotSupportedException(UnsupportedMessage);
     public Task Callback_UserOffline(UserDto _) => throw new PlatformNotSupportedException(UnsupportedMessage);
     public Task Callback_UserOnline(OnlineUser _) => throw new PlatformNotSupportedException(UnsupportedMessage);
+    public Task Callback_UserVanityUpdate(UserDto _) => throw new PlatformNotSupportedException(UnsupportedMessage);
     public Task Callback_ProfileUpdated(UserDto _) => throw new PlatformNotSupportedException(UnsupportedMessage);
 
     // --- InGame Account Verification ---

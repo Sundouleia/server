@@ -89,7 +89,7 @@ public class Startup
         // next, add the server token generator, system info service, and online synced pair cache service to the services
         services.AddSingleton<ServerTokenGenerator>();
         services.AddSingleton<SystemInfoService>();
-        services.AddSingleton<RadarService>();
+        services.AddSingleton<RadarChatService>();
         // Update later to be interfaced with the shared service.
         services.AddSingleton<SundouleiaFileHost.IFileHost>(x => new SundouleiaFileHost.FileHostService(
             sundouleiaConfig.GetValue<string>(nameof(SundouleiaConfigBase.FileHostAddress), string.Empty),
